@@ -1,0 +1,16 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: chat-api
+
+app:
+  security:
+    enabled: ${APP_SECURITY_ENABLED:false}
+  supabase-jwt-issuer: ${SUPABASE_JWT_ISSUER:}
+  supabase-url: ${SUPABASE_URL:}
+  supabase-service-role-key: ${SUPABASE_SERVICE_ROLE_KEY:}
+  ai-api-url: ${AI_API_URL:}
+  ai-model: ${AI_MODEL:}
+  ai-api-key: ${AI_API_KEY:}

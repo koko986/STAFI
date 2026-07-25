@@ -1,0 +1,17 @@
+# IDE and operating system files
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Local secrets
+**/.env
+
+# Java build output
+backend/target/
+
+# Frontend dependencies and build output
+frontend/node_modules/
+frontend/dist/
+frontend/npm-debug.log*

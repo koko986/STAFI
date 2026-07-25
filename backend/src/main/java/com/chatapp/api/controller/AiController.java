@@ -1,0 +1,36 @@
+package com.chatapp.api.controller;
+
+import com.chatapp.api.model.AiRequest;
+import com.chatapp.api.model.AiResponse;
+import com.chatapp.api.service.AiService;
+import jakarta.validation.Valid;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/api/ai")
+public class AiController {
+    private final AiService aiService;
+
+    public AiController(AiService aiService) {
+        this.aiService = aiService;
+    }
+
+    @PostMapping("/chat")
+    public AiResponse chat(@Valid @RequestBody AiRequest request) {
+        return aiService.respond(request);
+    }
+
+    @PostMapping("/summarize")
+    public AiResponse summarize(@Valid @RequestBody AiRequest request) {
+        return aiService.respond(new AiRequest(request.conversationId(), "summarize", request.prompt()));
+    }
+
+    @PostMapping("/draft-reply")
+    public AiResponse draftReply(@Valid @RequestBody AiRequest request) {
+        return aiService.respond(new AiRequest(request.conversationId(), "draft-reply", request.prompt()));
+    }
+}
+
