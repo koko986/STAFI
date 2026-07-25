@@ -21,6 +21,12 @@ Auth/Postgres/Storage, stories, voice messages, themes, and an AI assistant.
 - Node.js 20+
 - A Supabase project for real authentication and media storage
 
+## Quick Start On Windows
+
+Double-click `start-chat.cmd` in the project root. It opens separate backend and frontend
+PowerShell windows and then opens `http://localhost:5173/`. Keep both terminal windows open while
+using the application.
+
 ## Run The Backend
 
 Set the variables shown in `backend/.env.example`, or leave `APP_SECURITY_ENABLED=false` for
