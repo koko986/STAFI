@@ -72,6 +72,7 @@ export type Conversation = {
   id: string;
   type: "direct" | "group" | "ai_private";
   title: string;
+  profile?: Profile;
 };
 
 export type Message = {

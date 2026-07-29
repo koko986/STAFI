@@ -10,7 +10,7 @@ public record Conversation(
         @NotBlank String type,
         String title,
         UUID createdBy,
+        Profile profile,
         Instant createdAt
 ) {
 }
-

@@ -1,4 +1,4 @@
-import { Bot, Mic, Moon, Send, Square, Sun, WandSparkles } from "lucide-react";
+import { Bot, Mic, Moon, Send, Square, Sun, UserRound, WandSparkles } from "lucide-react";
 import { FormEvent, useRef, useState } from "react";
 import type { Conversation, Message } from "../lib/api";
 
@@ -11,9 +11,20 @@ type Props = {
   onSend: (body: string) => void;
   onSendVoice: (voice: Blob) => Promise<void>;
   onAskAi: (action: "summarize" | "draft-reply") => void;
+  onOpenInfo: () => void;
 };
 
-export function ChatWindow({ conversation, messages, currentUserId, theme, onToggleTheme, onSend, onSendVoice, onAskAi }: Props) {
+export function ChatWindow({
+  conversation,
+  messages,
+  currentUserId,
+  theme,
+  onToggleTheme,
+  onSend,
+  onSendVoice,
+  onAskAi,
+  onOpenInfo
+}: Props) {
   const [body, setBody] = useState("");
   const [recording, setRecording] = useState(false);
   const recorderRef = useRef<MediaRecorder>();
@@ -51,10 +62,23 @@ export function ChatWindow({ conversation, messages, currentUserId, theme, onTog
   return (
     <section className="chat-window">
       <header className="chat-header">
-        <div>
-          <strong>{conversation.title}</strong>
-          <small>Online now</small>
-        </div>
+        <button
+          className="chat-identity"
+          type="button"
+          title={conversation.profile ? "Open user info" : "Conversation details"}
+          onClick={onOpenInfo}
+          disabled={!conversation.profile}
+        >
+          <span className="avatar">
+            {conversation.profile?.avatarPath
+              ? <img src={conversation.profile.avatarPath} alt="" />
+              : <UserRound size={19} />}
+          </span>
+          <span>
+            <strong>{conversation.title}</strong>
+            <small>{conversation.profile ? `@${conversation.profile.username}` : "Online now"}</small>
+          </span>
+        </button>
         <div className="header-actions">
           <button title="Summarize with AI" onClick={() => onAskAi("summarize")}>
             <Bot size={18} />

@@ -18,17 +18,25 @@ import java.util.UUID;
 public class ChatService {
     private final SupabaseDatabase database;
     private final StorageService storageService;
+    private final ProfileService profileService;
 
-    public ChatService(SupabaseDatabase database, StorageService storageService) {
+    public ChatService(
+            SupabaseDatabase database,
+            StorageService storageService,
+            ProfileService profileService
+    ) {
         this.database = database;
         this.storageService = storageService;
+        this.profileService = profileService;
     }
 
     public List<Conversation> listConversations(UUID userId) {
         database.rpc("ensure_ai_conversation", Map.of("requester_id", userId));
         JsonNode rows = database.rpc("list_user_conversations", Map.of("requester_id", userId));
         List<Conversation> conversations = new ArrayList<>();
-        if (rows != null && rows.isArray()) rows.forEach(row -> conversations.add(toConversation(row)));
+        if (rows != null && rows.isArray()) {
+            rows.forEach(row -> conversations.add(toConversation(row, userId)));
+        }
         return conversations;
     }
 
@@ -42,7 +50,7 @@ public class ChatService {
         return toConversation(database.first(database.rpc(
                 "ensure_ai_conversation",
                 Map.of("requester_id", userId)
-        )));
+        )), userId);
     }
 
     public Conversation startDirectConversation(UUID userId, UUID profileId) {
@@ -52,7 +60,7 @@ public class ChatService {
                         "requester_id", userId,
                         "other_user_id", profileId
                 )
-        )));
+        )), userId);
         return listConversations(userId).stream()
                 .filter(conversation -> conversation.id().equals(stored.id()))
                 .findFirst()
@@ -67,7 +75,7 @@ public class ChatService {
                         "group_title", title.trim(),
                         "member_ids", memberIds
                 )
-        )));
+        )), userId);
     }
 
     public List<Message> listMessages(UUID conversationId, UUID userId) {
@@ -128,15 +136,32 @@ public class ChatService {
         }
     }
 
-    private Conversation toConversation(JsonNode row) {
+    private Conversation toConversation(JsonNode row, UUID viewerId) {
         if (row == null) throw new IllegalStateException("Supabase did not return a conversation.");
+        UUID conversationId = UUID.fromString(row.path("id").asText());
+        String type = row.path("type").asText();
         return new Conversation(
-                UUID.fromString(row.path("id").asText()),
-                row.path("type").asText(),
+                conversationId,
+                type,
                 row.path("title").asText("Untitled chat"),
                 UUID.fromString(row.path("created_by").asText()),
+                "direct".equals(type) ? directProfile(conversationId, viewerId) : null,
                 Instant.parse(row.path("created_at").asText())
         );
+    }
+
+    private com.chatapp.api.model.Profile directProfile(UUID conversationId, UUID viewerId) {
+        JsonNode row = database.first(database.query(
+                "conversation_members",
+                Map.of(
+                        "conversation_id", "eq." + conversationId,
+                        "user_id", "neq." + viewerId,
+                        "select", "user_id",
+                        "limit", "1"
+                )
+        ));
+        if (row == null) return null;
+        return profileService.find(UUID.fromString(row.path("user_id").asText())).orElse(null);
     }
 
     private Message toMessage(JsonNode row) {

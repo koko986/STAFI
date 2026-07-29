@@ -19,7 +19,9 @@ export function ConversationList({ conversations, activeId, onSelect }: Props) {
             onClick={() => onSelect(conversation)}
           >
             <span className="avatar">
-              <Icon size={18} />
+              {conversation.profile?.avatarPath
+                ? <img src={conversation.profile.avatarPath} alt="" />
+                : <Icon size={18} />}
             </span>
             <span>
               <strong>{conversation.title}</strong>
@@ -31,4 +33,3 @@ export function ConversationList({ conversations, activeId, onSelect }: Props) {
     </nav>
   );
 }
-

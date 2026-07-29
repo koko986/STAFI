@@ -3,11 +3,11 @@ import SockJS from "sockjs-client";
 import { useEffect, useMemo, useState } from "react";
 import { ChatDiscovery } from "./components/ChatDiscovery";
 import { ChatWindow } from "./components/ChatWindow";
-import { FriendProfile } from "./components/FriendProfile";
 import { Login } from "./components/Login";
 import { ProfileDetails } from "./components/ProfileDetails";
 import { ProfileOnboarding } from "./components/ProfileOnboarding";
 import { Stories } from "./components/Stories";
+import { UserInfoPanel } from "./components/UserInfoPanel";
 import {
   apiDelete,
   apiGet,
@@ -266,6 +266,7 @@ export function App() {
   }
 
   async function openFriendProfile(profileOrId: Profile | string) {
+    setProfileOpen(false);
     if (typeof profileOrId !== "string") {
       setFriendProfile(profileOrId);
       return;
@@ -340,7 +341,8 @@ export function App() {
         ) || {
           id: crypto.randomUUID(),
           type: "direct",
-          title: profileToChat.displayName
+          title: profileToChat.displayName,
+          profile: profileToChat
         }
       : await apiPost<Conversation>("/api/conversations/direct", {
           profileId: profileToChat.id
@@ -407,14 +409,17 @@ export function App() {
   }
 
   return (
-    <main className={theme === "dark" ? "app dark" : "app"}>
+    <main className={`${theme === "dark" ? "app dark" : "app"} ${profileOpen || friendProfile ? "info-open" : ""}`}>
       <aside className="sidebar">
         <div className="brand">
           <button
             className="current-profile"
             type="button"
             title="Open my profile"
-            onClick={() => setProfileOpen(true)}
+            onClick={() => {
+              setFriendProfile(undefined);
+              setProfileOpen(true);
+            }}
           >
             <span className="profile-mini-avatar">
               {profile?.avatarPath
@@ -442,9 +447,12 @@ export function App() {
         <ChatDiscovery
           conversations={conversations}
           activeId={active?.id}
-          onSelect={setActive}
+          onSelect={(conversation) => {
+            setActive(conversation);
+            setFriendProfile(undefined);
+          }}
           onStartDirect={startDirect}
-          onViewProfile={(selectedProfile) => setFriendProfile(selectedProfile)}
+          onViewProfile={(selectedProfile) => openFriendProfile(selectedProfile)}
           onCreateGroup={createGroup}
           fallbackPeople={demoMode ? demoPeople : noPeople}
         />
@@ -458,6 +466,9 @@ export function App() {
         onSend={send}
         onSendVoice={sendVoice}
         onAskAi={askAi}
+        onOpenInfo={() => {
+          if (active?.profile) openFriendProfile(active.profile);
+        }}
       />
       <ProfileDetails
         profile={profile}
@@ -466,8 +477,9 @@ export function App() {
         onClose={() => setProfileOpen(false)}
         onSave={saveProfile}
       />
-      <FriendProfile
+      <UserInfoPanel
         profile={friendProfile}
+        messages={active?.profile?.id === friendProfile?.id ? activeMessages : []}
         onClose={() => setFriendProfile(undefined)}
         onMessage={startDirect}
       />
