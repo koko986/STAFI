@@ -3,12 +3,28 @@ create extension if not exists "pgcrypto";
 create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   display_name text not null default 'New User',
+  username text,
+  bio text not null default '',
   avatar_path text,
   theme_mode text not null default 'system' check (theme_mode in ('light', 'dark', 'system')),
   accent_color text not null default '#2563eb',
+  onboarded boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.profiles add column if not exists username text;
+alter table public.profiles add column if not exists bio text not null default '';
+alter table public.profiles add column if not exists onboarded boolean not null default false;
+
+update public.profiles
+set username = 'user_' || left(replace(id::text, '-', ''), 8)
+where username is null or username = '';
+
+alter table public.profiles alter column username set not null;
+
+create unique index if not exists profiles_username_lower_idx
+on public.profiles (lower(username));
 
 create table if not exists public.conversations (
   id uuid primary key default gen_random_uuid(),
@@ -65,10 +81,11 @@ language plpgsql
 security definer set search_path = public
 as $$
 begin
-  insert into public.profiles (id, display_name, avatar_path)
+  insert into public.profiles (id, display_name, username, avatar_path)
   values (
     new.id,
     coalesce(new.raw_user_meta_data ->> 'full_name', new.phone, 'New User'),
+    'user_' || left(replace(new.id::text, '-', ''), 8),
     new.raw_user_meta_data ->> 'avatar_url'
   )
   on conflict (id) do nothing;

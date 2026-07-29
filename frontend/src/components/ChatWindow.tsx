@@ -5,6 +5,7 @@ import type { Conversation, Message } from "../lib/api";
 type Props = {
   conversation?: Conversation;
   messages: Message[];
+  currentUserId?: string;
   theme: "light" | "dark";
   onToggleTheme: () => void;
   onSend: (body: string) => void;
@@ -12,7 +13,7 @@ type Props = {
   onAskAi: (action: "summarize" | "draft-reply") => void;
 };
 
-export function ChatWindow({ conversation, messages, theme, onToggleTheme, onSend, onSendVoice, onAskAi }: Props) {
+export function ChatWindow({ conversation, messages, currentUserId, theme, onToggleTheme, onSend, onSendVoice, onAskAi }: Props) {
   const [body, setBody] = useState("");
   const [recording, setRecording] = useState(false);
   const recorderRef = useRef<MediaRecorder>();
@@ -68,7 +69,7 @@ export function ChatWindow({ conversation, messages, theme, onToggleTheme, onSen
       </header>
       <div className="messages">
         {messages.map((message) => (
-          <article className={message.type === "ai" ? "bubble ai" : message.senderId === "me" ? "bubble mine" : "bubble theirs"} key={message.id}>
+          <article className={message.type === "ai" ? "bubble ai" : message.senderId === "me" || message.senderId === currentUserId ? "bubble mine" : "bubble theirs"} key={message.id}>
             {message.type === "voice" ? <audio controls src={message.mediaPath} /> : <p>{message.body}</p>}
           </article>
         ))}

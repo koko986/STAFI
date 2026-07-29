@@ -1,6 +1,8 @@
 package com.chatapp.api.controller;
 
 import com.chatapp.api.model.Conversation;
+import com.chatapp.api.model.DirectConversationRequest;
+import com.chatapp.api.model.GroupConversationRequest;
 import com.chatapp.api.service.ChatService;
 import com.chatapp.api.service.UserContext;
 import jakarta.validation.Valid;
@@ -34,5 +36,27 @@ public class ConversationController {
     public Conversation create(@Valid @RequestBody Conversation request, @AuthenticationPrincipal Jwt jwt) {
         return chatService.createConversation(request, userContext.requireUserId(jwt));
     }
-}
 
+    @PostMapping("/direct")
+    public Conversation direct(
+            @Valid @RequestBody DirectConversationRequest request,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        return chatService.startDirectConversation(
+                userContext.requireUserId(jwt),
+                request.profileId()
+        );
+    }
+
+    @PostMapping("/groups")
+    public Conversation group(
+            @Valid @RequestBody GroupConversationRequest request,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        return chatService.createGroup(
+                userContext.requireUserId(jwt),
+                request.title(),
+                request.memberIds()
+        );
+    }
+}

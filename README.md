@@ -6,6 +6,8 @@ Auth/Postgres/Storage, stories, voice messages, themes, and an AI assistant.
 ## Included
 
 - Gmail OAuth and phone OTP login through Supabase
+- First-login profile setup with display names, usernames, bios, and avatars
+- Account search, reusable direct chats, and member-scoped group creation
 - Local demo mode when Supabase keys are not configured
 - Direct, group, and private AI conversations
 - REST message history and STOMP WebSocket delivery
@@ -65,11 +67,14 @@ Run `supabase/schema.sql` in the Supabase SQL editor, then create three private 
 The schema creates a profile for each OAuth/phone user and enables row-level security. Review
 `supabase/storage.md` before deploying.
 
+Rerun the schema after pulling profile changes. It safely adds usernames, bios, and onboarding
+state to an existing project without dropping profile or chat tables.
+
 ## Production Notes
 
 - Replace the in-memory `ChatService` and `StoryService` stores with Supabase repositories before
   running more than one Java server.
-- Keep `SUPABASE_SERVICE_ROLE_KEY` on the Java server. Never expose it through a `VITE_` value.
+- Keep `SUPABASE_SECRET_KEY` on the Java server. Never expose it through a `VITE_` value.
 - Set `AI_API_URL`, `AI_MODEL`, and `AI_API_KEY` to use an OpenAI-compatible chat-completions
   provider. Without them, the assistant remains in offline demo mode.
 - Pass only messages the authenticated user is authorized to read into AI requests.

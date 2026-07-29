@@ -1,6 +1,6 @@
 import { isSupabaseConfigured, supabase } from "./supabase";
 
-export async function storeMedia(bucket: "voice-messages" | "stories", file: Blob, extension: string) {
+export async function storeMedia(bucket: "avatars" | "voice-messages" | "stories", file: Blob, extension: string) {
   if (!isSupabaseConfigured) {
     return URL.createObjectURL(file);
   }

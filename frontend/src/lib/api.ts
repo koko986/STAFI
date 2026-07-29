@@ -27,6 +27,27 @@ export async function apiPost<T>(path: string, body: unknown): Promise<T> {
   return response.json();
 }
 
+export async function apiPut<T>(path: string, body: unknown): Promise<T> {
+  const response = await fetch(`${API_URL}${path}`, {
+    method: "PUT",
+    headers: await authHeaders(),
+    body: JSON.stringify(body)
+  });
+  if (!response.ok) throw new Error(await response.text());
+  return response.json();
+}
+
+export type Profile = {
+  id: string;
+  displayName: string;
+  username: string;
+  bio: string;
+  avatarPath?: string;
+  themeMode: "light" | "dark" | "system";
+  accentColor: string;
+  onboarded: boolean;
+};
+
 export type Conversation = {
   id: string;
   type: "direct" | "group" | "ai_private";

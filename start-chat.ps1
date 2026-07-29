@@ -1,12 +1,45 @@
 $projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $backendPath = Join-Path $projectRoot "backend"
 $frontendPath = Join-Path $projectRoot "frontend"
+$bundledJava21 = Join-Path $env:USERPROFILE ".vscode\extensions\redhat.java-1.55.0-win32-x64\jre\21.0.11-win32-x86_64"
 
-$backendCommand = "Set-Location -LiteralPath '$($backendPath.Replace("'", "''"))'; mvn.cmd spring-boot:run"
-$frontendCommand = "Set-Location -LiteralPath '$($frontendPath.Replace("'", "''"))'; npm.cmd run dev -- --host localhost"
+if (Test-Path (Join-Path $bundledJava21 "bin\java.exe")) {
+    $backendCommand = "set `"JAVA_HOME=$bundledJava21`" && set `"PATH=$bundledJava21\bin;%PATH%`" && cd /d `"$backendPath`" && mvn.cmd spring-boot:run"
+}
+else {
+    $backendCommand = "cd /d `"$backendPath`" && mvn.cmd spring-boot:run"
+}
+$frontendCommand = "cd /d `"$frontendPath`" && npm.cmd run dev -- --host 0.0.0.0 --port 5173 --strictPort"
 
-Start-Process powershell.exe -ArgumentList @("-NoExit", "-NoProfile", "-Command", $backendCommand)
-Start-Process powershell.exe -ArgumentList @("-NoExit", "-NoProfile", "-Command", $frontendCommand)
+function Test-LocalPort {
+    param([int]$Port)
 
-Start-Sleep -Seconds 3
+    $client = [System.Net.Sockets.TcpClient]::new()
+    try {
+        $connection = $client.ConnectAsync("127.0.0.1", $Port)
+        return $connection.Wait(500) -and $client.Connected
+    }
+    catch {
+        return $false
+    }
+    finally {
+        $client.Dispose()
+    }
+}
+
+if (Test-LocalPort -Port 8080) {
+    Write-Host "Backend is already running on http://localhost:8080"
+}
+else {
+    Start-Process -FilePath $env:ComSpec -ArgumentList @("/k", $backendCommand) -WindowStyle Normal
+}
+
+if (Test-LocalPort -Port 5173) {
+    Write-Host "Frontend is already running on http://localhost:5173"
+}
+else {
+    Start-Process -FilePath $env:ComSpec -ArgumentList @("/k", $frontendCommand) -WindowStyle Normal
+}
+
+Start-Sleep -Seconds 5
 Start-Process "http://localhost:5173/"

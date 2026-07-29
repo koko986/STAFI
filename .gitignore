@@ -15,3 +15,7 @@ backend/target/
 frontend/node_modules/
 frontend/dist/
 frontend/npm-debug.log*
+
+# Local runtime output and accidental nested dependencies
+.runlogs/
+backend/node_modules/

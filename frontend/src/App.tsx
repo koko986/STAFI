@@ -1,11 +1,12 @@
 import { Client } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
 import { useEffect, useMemo, useState } from "react";
+import { ChatDiscovery } from "./components/ChatDiscovery";
 import { ChatWindow } from "./components/ChatWindow";
-import { ConversationList } from "./components/ConversationList";
 import { Login } from "./components/Login";
+import { ProfileOnboarding } from "./components/ProfileOnboarding";
 import { Stories } from "./components/Stories";
-import { apiGet, apiPost, type Conversation, type Message, type Story } from "./lib/api";
+import { apiGet, apiPost, type Conversation, type Message, type Profile, type Story } from "./lib/api";
 import { storeMedia } from "./lib/media";
 import { isSupabaseConfigured, supabase } from "./lib/supabase";
 
@@ -15,6 +16,23 @@ const fallbackConversations: Conversation[] = [
   { id: "33333333-3333-3333-3333-333333333333", type: "ai_private", title: "AI Assistant" }
 ];
 
+const demoProfile: Profile = {
+  id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+  displayName: "Demo User",
+  username: "demo_user",
+  bio: "Exploring Java Chat.",
+  themeMode: "system",
+  accentColor: "#2563eb",
+  onboarded: true
+};
+
+const demoPeople: Profile[] = [
+  { ...demoProfile, id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", displayName: "Aye Aye", username: "aye_codes", bio: "Java developer and coffee enthusiast." },
+  { ...demoProfile, id: "cccccccc-cccc-cccc-cccc-cccccccccccc", displayName: "Min Khant", username: "minkhant", bio: "Building useful things with friends." },
+  { ...demoProfile, id: "dddddddd-dddd-dddd-dddd-dddddddddddd", displayName: "Su Myat", username: "sumyat", bio: "Design, music, and weekend stories." }
+];
+const noPeople: Profile[] = [];
+
 export function App() {
   const [ready, setReady] = useState(!isSupabaseConfigured);
   const [loggedIn, setLoggedIn] = useState(!isSupabaseConfigured);
@@ -22,44 +40,85 @@ export function App() {
   const [theme, setTheme] = useState<"light" | "dark">(
     () => (localStorage.getItem("java-chat-theme") as "light" | "dark") || "light"
   );
-  const [conversations, setConversations] = useState<Conversation[]>(fallbackConversations);
-  const [active, setActive] = useState<Conversation>(fallbackConversations[0]);
+  const [profile, setProfile] = useState<Profile>();
+  const [profileReady, setProfileReady] = useState(!isSupabaseConfigured);
+  const [conversations, setConversations] = useState<Conversation[]>(
+    isSupabaseConfigured ? [] : fallbackConversations
+  );
+  const [active, setActive] = useState<Conversation | undefined>(
+    isSupabaseConfigured ? undefined : fallbackConversations[0]
+  );
   const [messages, setMessages] = useState<Message[]>([]);
   const [stories, setStories] = useState<Story[]>([]);
 
   const activeMessages = useMemo(
-    () => messages.filter((message) => message.conversationId === active.id),
-    [active.id, messages]
+    () => active ? messages.filter((message) => message.conversationId === active.id) : [],
+    [active, messages]
   );
 
   useEffect(() => {
     if (!isSupabaseConfigured) return;
-    supabase.auth.getSession().then(({ data }) => {
-      setLoggedIn(Boolean(data.session));
-      setReady(true);
-    });
+    let mounted = true;
+    const sessionTimeout = window.setTimeout(() => {
+      if (mounted) setReady(true);
+    }, 4000);
+
+    supabase.auth.getSession()
+      .then(({ data }) => {
+        if (mounted) setLoggedIn(Boolean(data.session));
+      })
+      .catch(() => {
+        if (mounted) setLoggedIn(false);
+      })
+      .finally(() => {
+        if (mounted) setReady(true);
+      });
+
     const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!mounted) return;
       setLoggedIn(Boolean(session));
       setReady(true);
     });
-    return () => data.subscription.unsubscribe();
+
+    return () => {
+      mounted = false;
+      window.clearTimeout(sessionTimeout);
+      data.subscription.unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
     if (!loggedIn) return;
-    apiGet<Conversation[]>("/api/conversations")
-      .then((items) => {
-        if (items.length) {
-          setConversations(items);
-          setActive(items[0]);
-        }
-      })
-      .catch(() => setConversations(fallbackConversations));
-    apiGet<Story[]>("/api/stories").then(setStories).catch(() => undefined);
-  }, [loggedIn]);
+    if (demoMode) {
+      setProfile(demoProfile);
+      setProfileReady(true);
+      return;
+    }
+    setProfileReady(false);
+    apiGet<Profile>("/api/me/profile")
+      .then(setProfile)
+      .catch(() => setProfile(undefined))
+      .finally(() => setProfileReady(true));
+  }, [demoMode, loggedIn]);
 
   useEffect(() => {
-    if (!loggedIn) return;
+    if (!loggedIn || !profile?.onboarded) return;
+    apiGet<Conversation[]>("/api/conversations")
+      .then((items) => {
+        setConversations(items);
+        setActive((current) => items.find((item) => item.id === current?.id) || items[0]);
+      })
+      .catch(() => {
+        if (demoMode) {
+          setConversations(fallbackConversations);
+          setActive((current) => current || fallbackConversations[0]);
+        }
+      });
+    apiGet<Story[]>("/api/stories").then(setStories).catch(() => undefined);
+  }, [demoMode, loggedIn, profile?.onboarded]);
+
+  useEffect(() => {
+    if (!loggedIn || !active) return;
     apiGet<Message[]>(`/api/conversations/${active.id}/messages`)
       .then((items) => {
         setMessages((current) => [
@@ -68,10 +127,10 @@ export function App() {
         ]);
       })
       .catch(() => undefined);
-  }, [active.id, loggedIn]);
+  }, [active, loggedIn]);
 
   useEffect(() => {
-    if (!loggedIn) return;
+    if (!loggedIn || !active) return;
     const client = new Client({
       webSocketFactory: () => new SockJS(import.meta.env.VITE_WS_URL || "http://localhost:8080/ws"),
       reconnectDelay: 5000,
@@ -88,9 +147,10 @@ export function App() {
     return () => {
       client.deactivate();
     };
-  }, [active.id, loggedIn]);
+  }, [active, loggedIn]);
 
   async function send(body: string) {
+    if (!active) return;
     const id = crypto.randomUUID();
     const optimistic: Message = {
       id,
@@ -105,6 +165,7 @@ export function App() {
   }
 
   async function sendVoice(voice: Blob) {
+    if (!active) return;
     const mediaPath = await storeMedia("voice-messages", voice, "webm");
     const id = crypto.randomUUID();
     const message: Message = {
@@ -143,6 +204,7 @@ export function App() {
   }
 
   async function askAi(action: "summarize" | "draft-reply") {
+    if (!active) return;
     const prompt = activeMessages
       .filter((message) => message.body)
       .slice(-20)
@@ -181,29 +243,123 @@ export function App() {
     if (!demoMode) await supabase.auth.signOut();
     setDemoMode(false);
     setLoggedIn(false);
+    setProfile(undefined);
+    setProfileReady(false);
+    setConversations([]);
+    setActive(undefined);
+    setMessages([]);
+    setStories([]);
   }
 
-  if (!ready) return null;
+  async function startDirect(profileToChat: Profile) {
+    const conversation: Conversation = demoMode
+      ? conversations.find(
+          (item) => item.type === "direct" && item.title === profileToChat.displayName
+        ) || {
+          id: crypto.randomUUID(),
+          type: "direct",
+          title: profileToChat.displayName
+        }
+      : await apiPost<Conversation>("/api/conversations/direct", {
+          profileId: profileToChat.id
+        });
+
+    setConversations((current) =>
+      current.some((item) => item.id === conversation.id) ? current : [conversation, ...current]
+    );
+    setActive(conversation);
+  }
+
+  async function createGroup(title: string, memberIds: string[]) {
+    const conversation: Conversation = demoMode
+      ? { id: crypto.randomUUID(), type: "group", title }
+      : await apiPost<Conversation>("/api/conversations/groups", { title, memberIds });
+    setConversations((current) => [conversation, ...current]);
+    setActive(conversation);
+  }
+
+  if (!ready) {
+    return (
+      <main className="loading-shell" aria-live="polite">
+        <div className="loading-mark" aria-hidden="true">J</div>
+        <strong>Java Chat</strong>
+        <span>Connecting...</span>
+      </main>
+    );
+  }
   if (!loggedIn) {
-    return <Login onDemo={() => { setDemoMode(true); setLoggedIn(true); }} />;
+    return <Login onDemo={() => {
+      setDemoMode(true);
+      setProfile(demoProfile);
+      setProfileReady(true);
+      setLoggedIn(true);
+    }} />;
+  }
+  if (!profileReady) {
+    return (
+      <main className="loading-shell" aria-live="polite">
+        <div className="loading-mark" aria-hidden="true">J</div>
+        <strong>Preparing your chats</strong>
+        <span>Loading profile...</span>
+      </main>
+    );
+  }
+  if (!profile) {
+    return (
+      <main className="loading-shell" aria-live="polite">
+        <div className="loading-mark" aria-hidden="true">!</div>
+        <strong>Could not load your profile</strong>
+        <span>Check that the Java backend is running, then try again.</span>
+        <button className="primary-button" type="button" onClick={() => window.location.reload()}>
+          Try again
+        </button>
+        <button className="text-button" type="button" onClick={signOut}>
+          Sign out
+        </button>
+      </main>
+    );
+  }
+  if (!demoMode && profile && !profile.onboarded) {
+    return (
+      <ProfileOnboarding
+        initialProfile={profile}
+        onComplete={setProfile}
+        onSignOut={signOut}
+      />
+    );
   }
 
   return (
     <main className={theme === "dark" ? "app dark" : "app"}>
       <aside className="sidebar">
         <div className="brand">
-          <div>
-            <strong>Java Chat</strong>
-            {demoMode && <small>Demo mode</small>}
+          <div className="current-profile">
+            <span className="profile-mini-avatar">
+              {profile?.avatarPath
+                ? <img src={profile.avatarPath} alt="" />
+                : (profile?.displayName || "J").slice(0, 1).toUpperCase()}
+            </span>
+            <span>
+              <strong>{profile?.displayName || "Java Chat"}</strong>
+              <small>{demoMode ? "Demo mode" : `@${profile?.username}`}</small>
+            </span>
           </div>
           <button onClick={signOut}>Sign out</button>
         </div>
         <Stories stories={stories} onCreate={createStory} />
-        <ConversationList conversations={conversations} activeId={active.id} onSelect={setActive} />
+        <ChatDiscovery
+          conversations={conversations}
+          activeId={active?.id}
+          onSelect={setActive}
+          onStartDirect={startDirect}
+          onCreateGroup={createGroup}
+          fallbackPeople={demoMode ? demoPeople : noPeople}
+        />
       </aside>
       <ChatWindow
         conversation={active}
         messages={activeMessages}
+        currentUserId={profile?.id}
         theme={theme}
         onToggleTheme={toggleTheme}
         onSend={send}
