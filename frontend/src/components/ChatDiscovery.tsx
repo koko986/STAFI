@@ -28,33 +28,64 @@ export function ChatDiscovery({
   const [groupPeople, setGroupPeople] = useState<Profile[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+  const [openingProfileId, setOpeningProfileId] = useState<string>();
   const [status, setStatus] = useState("");
 
+  const normalizedQuery = query.trim().replace(/^@+/, "");
+
   const visibleConversations = useMemo(() => {
-    const needle = query.trim().toLowerCase();
+    const needle = normalizedQuery.toLowerCase();
     if (!needle) return conversations;
     return conversations.filter((conversation) => conversation.title.toLowerCase().includes(needle));
-  }, [conversations, query]);
+  }, [conversations, normalizedQuery]);
 
   useEffect(() => {
-    const needle = query.trim();
+    const needle = normalizedQuery;
     if (needle.length < 2) {
       setPeople([]);
       setSearching(false);
       return;
     }
+
+    let active = true;
     setSearching(true);
+    setStatus("");
     const timeout = window.setTimeout(() => {
       apiGet<Profile[]>(`/api/profiles/search?q=${encodeURIComponent(needle)}`)
-        .then(setPeople)
-        .catch(() => setPeople(fallbackPeople.filter((profile) =>
-          profile.displayName.toLowerCase().includes(needle.toLowerCase())
-          || profile.username.toLowerCase().includes(needle.toLowerCase())
-        )))
-        .finally(() => setSearching(false));
+        .then((matches) => {
+          if (active) setPeople(matches);
+        })
+        .catch(() => {
+          if (!active) return;
+          setPeople(fallbackPeople.filter((profile) =>
+            profile.displayName.toLowerCase().includes(needle.toLowerCase())
+            || profile.username.toLowerCase().includes(needle.toLowerCase())
+          ));
+          if (!fallbackPeople.length) setStatus("Could not search people. Check that the backend is running.");
+        })
+        .finally(() => {
+          if (active) setSearching(false);
+        });
     }, 250);
-    return () => window.clearTimeout(timeout);
-  }, [fallbackPeople, query]);
+    return () => {
+      active = false;
+      window.clearTimeout(timeout);
+    };
+  }, [fallbackPeople, normalizedQuery]);
+
+  async function startDirect(profile: Profile) {
+    setOpeningProfileId(profile.id);
+    setStatus("");
+    try {
+      await onStartDirect(profile);
+      setQuery("");
+      setPeople([]);
+    } catch {
+      setStatus(`Could not open a chat with @${profile.username}. Please try again.`);
+    } finally {
+      setOpeningProfileId(undefined);
+    }
+  }
 
   async function openGroup() {
     setGroupOpen(true);
@@ -106,9 +137,12 @@ export function ChatDiscovery({
         <Search size={17} aria-hidden="true" />
         <input
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search chats or people"
-          aria-label="Search chats or people"
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setStatus("");
+          }}
+          placeholder="Search name or @username"
+          aria-label="Search by name or username"
         />
         {query && (
           <button type="button" title="Clear search" onClick={() => setQuery("")}>
@@ -121,7 +155,7 @@ export function ChatDiscovery({
       </div>
 
       <div className="discovery-content">
-        {query.trim().length >= 2 && (
+        {normalizedQuery.length >= 2 && (
           <section className="people-results" aria-label="People">
             <div className="section-label">
               <span>People</span>
@@ -132,10 +166,8 @@ export function ChatDiscovery({
                 className="person-result"
                 type="button"
                 key={profile.id}
-                onClick={async () => {
-                  await onStartDirect(profile);
-                  setQuery("");
-                }}
+                onClick={() => startDirect(profile)}
+                disabled={Boolean(openingProfileId)}
               >
                 <span className="avatar">
                   {profile.avatarPath ? <img src={profile.avatarPath} alt="" /> : <UserRound size={18} />}
@@ -143,11 +175,15 @@ export function ChatDiscovery({
                 <span>
                   <strong>{profile.displayName}</strong>
                   <small>@{profile.username}</small>
+                  {profile.bio && <small className="person-bio">{profile.bio}</small>}
                 </span>
-                <MessageCircle size={17} />
+                {openingProfileId === profile.id
+                  ? <small className="opening-chat">Opening...</small>
+                  : <MessageCircle size={17} />}
               </button>
             ))}
             {!searching && people.length === 0 && <p className="empty-note">No people found.</p>}
+            {status && !groupOpen && <p className="discovery-status" role="status">{status}</p>}
           </section>
         )}
 

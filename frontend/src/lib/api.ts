@@ -2,11 +2,11 @@ import { supabase } from "./supabase";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
 
-async function authHeaders() {
+async function authHeaders(includeJsonContentType = true): Promise<Record<string, string>> {
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
   return {
-    "Content-Type": "application/json",
+    ...(includeJsonContentType ? { "Content-Type": "application/json" } : {}),
     ...(token ? { Authorization: `Bearer ${token}` } : {})
   };
 }
@@ -32,6 +32,18 @@ export async function apiPut<T>(path: string, body: unknown): Promise<T> {
     method: "PUT",
     headers: await authHeaders(),
     body: JSON.stringify(body)
+  });
+  if (!response.ok) throw new Error(await response.text());
+  return response.json();
+}
+
+export async function apiUpload<T>(path: string, file: Blob, filename: string): Promise<T> {
+  const formData = new FormData();
+  formData.append("file", file, filename);
+  const response = await fetch(`${API_URL}${path}`, {
+    method: "POST",
+    headers: await authHeaders(false),
+    body: formData
   });
   if (!response.ok) throw new Error(await response.text());
   return response.json();

@@ -31,7 +31,10 @@ public class MessageController {
     }
 
     @GetMapping("/conversations/{conversationId}/messages")
-    public List<Message> list(@PathVariable UUID conversationId, @AuthenticationPrincipal Jwt jwt) {
+    public List<Message> list(
+            @PathVariable("conversationId") UUID conversationId,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
         return chatService.listMessages(conversationId, userContext.requireUserId(jwt));
     }
 
@@ -42,4 +45,3 @@ public class MessageController {
         return message;
     }
 }
-

@@ -4,10 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import { ChatDiscovery } from "./components/ChatDiscovery";
 import { ChatWindow } from "./components/ChatWindow";
 import { Login } from "./components/Login";
+import { ProfileDetails } from "./components/ProfileDetails";
 import { ProfileOnboarding } from "./components/ProfileOnboarding";
 import { Stories } from "./components/Stories";
-import { apiGet, apiPost, type Conversation, type Message, type Profile, type Story } from "./lib/api";
-import { storeMedia } from "./lib/media";
+import { apiGet, apiPost, apiPut, type Conversation, type Message, type Profile, type Story } from "./lib/api";
+import { storeMedia, uploadMedia } from "./lib/media";
 import { isSupabaseConfigured, supabase } from "./lib/supabase";
 
 const fallbackConversations: Conversation[] = [
@@ -42,6 +43,10 @@ export function App() {
   );
   const [profile, setProfile] = useState<Profile>();
   const [profileReady, setProfileReady] = useState(!isSupabaseConfigured);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [accountContact, setAccountContact] = useState(
+    isSupabaseConfigured ? "" : "Demo account"
+  );
   const [conversations, setConversations] = useState<Conversation[]>(
     isSupabaseConfigured ? [] : fallbackConversations
   );
@@ -99,6 +104,13 @@ export function App() {
       .then(setProfile)
       .catch(() => setProfile(undefined))
       .finally(() => setProfileReady(true));
+  }, [demoMode, loggedIn]);
+
+  useEffect(() => {
+    if (!loggedIn || demoMode) return;
+    supabase.auth.getUser()
+      .then(({ data }) => setAccountContact(data.user?.phone || data.user?.email || ""))
+      .catch(() => setAccountContact(""));
   }, [demoMode, loggedIn]);
 
   useEffect(() => {
@@ -166,14 +178,14 @@ export function App() {
 
   async function sendVoice(voice: Blob) {
     if (!active) return;
-    const mediaPath = await storeMedia("voice-messages", voice, "webm");
+    const uploaded = await uploadMedia("voice-messages", voice, "webm");
     const id = crypto.randomUUID();
     const message: Message = {
       id,
       conversationId: active.id,
       senderId: "me",
       type: "voice",
-      mediaPath,
+      mediaPath: uploaded.url,
       createdAt: new Date().toISOString()
     };
     setMessages((current) => [...current, message]);
@@ -181,23 +193,26 @@ export function App() {
       id,
       conversationId: active.id,
       type: "voice",
-      mediaPath
+      mediaPath: uploaded.path
     }).catch(() => undefined);
   }
 
   async function createStory(file: File) {
     const extension = file.name.split(".").pop() || (file.type.startsWith("video") ? "webm" : "jpg");
-    const mediaPath = await storeMedia("stories", file, extension);
+    const uploaded = await uploadMedia("stories", file, extension);
     const localStory: Story = {
       id: crypto.randomUUID(),
       ownerId: "me",
-      mediaPath,
+      mediaPath: uploaded.url,
       caption: "My Story",
       createdAt: new Date().toISOString(),
       expiresAt: new Date(Date.now() + 86_400_000).toISOString()
     };
     setStories((current) => [...current, localStory]);
-    const saved = await apiPost<Story>("/api/stories", { mediaPath, caption: "My Story" }).catch(() => undefined);
+    const saved = await apiPost<Story>("/api/stories", {
+      mediaPath: uploaded.path,
+      caption: "My Story"
+    }).catch(() => undefined);
     if (saved) {
       setStories((current) => [...current.filter((story) => story.id !== localStory.id), saved]);
     }
@@ -249,6 +264,16 @@ export function App() {
     setActive(undefined);
     setMessages([]);
     setStories([]);
+    setProfileOpen(false);
+  }
+
+  async function saveProfile(updatedProfile: Profile) {
+    if (demoMode) {
+      setProfile(updatedProfile);
+      return;
+    }
+    const saved = await apiPut<Profile>("/api/me/profile", updatedProfile);
+    setProfile(saved);
   }
 
   async function startDirect(profileToChat: Profile) {
@@ -288,12 +313,7 @@ export function App() {
     );
   }
   if (!loggedIn) {
-    return <Login onDemo={() => {
-      setDemoMode(true);
-      setProfile(demoProfile);
-      setProfileReady(true);
-      setLoggedIn(true);
-    }} />;
+    return <Login />;
   }
   if (!profileReady) {
     return (
@@ -333,7 +353,12 @@ export function App() {
     <main className={theme === "dark" ? "app dark" : "app"}>
       <aside className="sidebar">
         <div className="brand">
-          <div className="current-profile">
+          <button
+            className="current-profile"
+            type="button"
+            title="Open my profile"
+            onClick={() => setProfileOpen(true)}
+          >
             <span className="profile-mini-avatar">
               {profile?.avatarPath
                 ? <img src={profile.avatarPath} alt="" />
@@ -343,7 +368,7 @@ export function App() {
               <strong>{profile?.displayName || "Java Chat"}</strong>
               <small>{demoMode ? "Demo mode" : `@${profile?.username}`}</small>
             </span>
-          </div>
+          </button>
           <button onClick={signOut}>Sign out</button>
         </div>
         <Stories stories={stories} onCreate={createStory} />
@@ -365,6 +390,13 @@ export function App() {
         onSend={send}
         onSendVoice={sendVoice}
         onAskAi={askAi}
+      />
+      <ProfileDetails
+        profile={profile}
+        accountContact={accountContact}
+        open={profileOpen}
+        onClose={() => setProfileOpen(false)}
+        onSave={saveProfile}
       />
     </main>
   );

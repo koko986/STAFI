@@ -2,207 +2,169 @@ package com.chatapp.api.service;
 
 import com.chatapp.api.model.Conversation;
 import com.chatapp.api.model.Message;
-import com.chatapp.api.model.Profile;
+import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
-import java.util.Comparator;
-import java.util.LinkedHashSet;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 @Service
 public class ChatService {
-    private static final UUID DEMO_USER_ID = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
-    private final Map<UUID, Conversation> conversations = new ConcurrentHashMap<>();
-    private final Map<UUID, Set<UUID>> membersByConversation = new ConcurrentHashMap<>();
-    private final Map<UUID, List<Message>> messagesByConversation = new ConcurrentHashMap<>();
-    private final ProfileService profileService;
+    private final SupabaseDatabase database;
+    private final StorageService storageService;
 
-    public ChatService(ProfileService profileService) {
-        this.profileService = profileService;
-        seedConversation("11111111-1111-1111-1111-111111111111", "direct", null,
-                Set.of(DEMO_USER_ID, UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")),
-                "Welcome to Java Chat. Send a message or record a voice note.");
-        seedConversation("22222222-2222-2222-2222-222222222222", "group", "Project Team",
-                Set.of(
-                        DEMO_USER_ID,
-                        UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
-                        UUID.fromString("cccccccc-cccc-cccc-cccc-cccccccccccc")
-                ),
-                "The project room is ready.");
+    public ChatService(SupabaseDatabase database, StorageService storageService) {
+        this.database = database;
+        this.storageService = storageService;
     }
 
     public List<Conversation> listConversations(UUID userId) {
-        ensureAiConversation(userId);
-        return conversations.values().stream()
-                .filter(conversation -> isMember(conversation.id(), userId))
-                .sorted(Comparator.comparing(Conversation::createdAt).reversed())
-                .map(conversation -> viewFor(conversation, userId))
-                .toList();
+        database.rpc("ensure_ai_conversation", Map.of("requester_id", userId));
+        JsonNode rows = database.rpc("list_user_conversations", Map.of("requester_id", userId));
+        List<Conversation> conversations = new ArrayList<>();
+        if (rows != null && rows.isArray()) rows.forEach(row -> conversations.add(toConversation(row)));
+        return conversations;
     }
 
     public Conversation createConversation(Conversation request, UUID userId) {
-        Conversation conversation = create(
-                request.type(),
-                request.title(),
-                userId,
-                Set.of(userId)
-        );
-        return viewFor(conversation, userId);
+        if (!"ai_private".equals(request.type())) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Use the direct or group conversation endpoint."
+            );
+        }
+        return toConversation(database.first(database.rpc(
+                "ensure_ai_conversation",
+                Map.of("requester_id", userId)
+        )));
     }
 
     public Conversation startDirectConversation(UUID userId, UUID profileId) {
-        if (userId.equals(profileId)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "You cannot start a chat with yourself.");
-        }
-        profileService.find(profileId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Profile not found."));
-
-        Conversation existing = conversations.values().stream()
-                .filter(conversation -> conversation.type().equals("direct"))
-                .filter(conversation -> {
-                    Set<UUID> members = membersByConversation.getOrDefault(conversation.id(), Set.of());
-                    return members.size() == 2 && members.contains(userId) && members.contains(profileId);
-                })
+        Conversation stored = toConversation(database.first(database.rpc(
+                "start_direct_conversation",
+                Map.of(
+                        "requester_id", userId,
+                        "other_user_id", profileId
+                )
+        )));
+        return listConversations(userId).stream()
+                .filter(conversation -> conversation.id().equals(stored.id()))
                 .findFirst()
-                .orElse(null);
-        if (existing != null) return viewFor(existing, userId);
-
-        Conversation conversation = create("direct", null, userId, Set.of(userId, profileId));
-        messagesByConversation.get(conversation.id()).add(systemMessage(
-                conversation.id(),
-                "You are connected. Say hello!"
-        ));
-        return viewFor(conversation, userId);
+                .orElse(stored);
     }
 
     public Conversation createGroup(UUID userId, String title, List<UUID> memberIds) {
-        Set<UUID> members = new LinkedHashSet<>(memberIds);
-        members.add(userId);
-        if (members.size() < 2) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Select at least one group member.");
-        }
-        members.forEach(memberId -> profileService.find(memberId)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND,
-                        "A selected profile was not found."
-                )));
-
-        Conversation conversation = create("group", title.trim(), userId, members);
-        messagesByConversation.get(conversation.id()).add(systemMessage(
-                conversation.id(),
-                userDisplayName(userId) + " created the group."
-        ));
-        return viewFor(conversation, userId);
+        return toConversation(database.first(database.rpc(
+                "create_group_conversation",
+                Map.of(
+                        "requester_id", userId,
+                        "group_title", title.trim(),
+                        "member_ids", memberIds
+                )
+        )));
     }
 
     public List<Message> listMessages(UUID conversationId, UUID userId) {
         requireMembership(conversationId, userId);
-        return List.copyOf(messagesByConversation.getOrDefault(conversationId, List.of()));
+        JsonNode rows = database.query(
+                "messages",
+                Map.of(
+                        "conversation_id", "eq." + conversationId,
+                        "deleted_at", "is.null",
+                        "select", "*",
+                        "order", "created_at.asc"
+                )
+        );
+        List<Message> messages = new ArrayList<>();
+        if (rows != null && rows.isArray()) rows.forEach(row -> messages.add(toMessage(row)));
+        if (!messages.isEmpty()) {
+            database.update(
+                    "conversation_members",
+                    Map.of(
+                            "conversation_id", "eq." + conversationId,
+                            "user_id", "eq." + userId
+                    ),
+                    Map.of("last_read_message_id", messages.get(messages.size() - 1).id())
+            );
+        }
+        return messages;
     }
 
     public Message addMessage(Message request, UUID userId) {
         requireMembership(request.conversationId(), userId);
-        Message message = request.withServerFields(userId);
-        messagesByConversation
-                .computeIfAbsent(message.conversationId(), ignored -> new CopyOnWriteArrayList<>())
-                .add(message);
-        return message;
-    }
-
-    private Conversation create(String type, String title, UUID createdBy, Set<UUID> members) {
-        Conversation conversation = new Conversation(
-                UUID.randomUUID(),
-                type,
-                title,
-                createdBy,
-                Instant.now()
-        );
-        conversations.put(conversation.id(), conversation);
-        membersByConversation.put(conversation.id(), ConcurrentHashMap.newKeySet());
-        membersByConversation.get(conversation.id()).addAll(members);
-        messagesByConversation.put(conversation.id(), new CopyOnWriteArrayList<>());
-        return conversation;
-    }
-
-    private void ensureAiConversation(UUID userId) {
-        boolean exists = conversations.values().stream()
-                .anyMatch(conversation -> conversation.type().equals("ai_private")
-                        && isMember(conversation.id(), userId));
-        if (exists) return;
-        Conversation conversation = create("ai_private", "AI Assistant", userId, Set.of(userId));
-        messagesByConversation.get(conversation.id()).add(systemMessage(
-                conversation.id(),
-                "Ask me to summarize a conversation or draft a reply."
-        ));
-    }
-
-    private Conversation viewFor(Conversation conversation, UUID userId) {
-        if (!conversation.type().equals("direct")) return conversation;
-        UUID otherUserId = membersByConversation.getOrDefault(conversation.id(), Set.of()).stream()
-                .filter(memberId -> !memberId.equals(userId))
-                .findFirst()
-                .orElse(userId);
-        return new Conversation(
-                conversation.id(),
-                conversation.type(),
-                userDisplayName(otherUserId),
-                conversation.createdBy(),
-                conversation.createdAt()
-        );
-    }
-
-    private String userDisplayName(UUID userId) {
-        return profileService.find(userId).map(Profile::displayName).orElse("Java Chat user");
-    }
-
-    private boolean isMember(UUID conversationId, UUID userId) {
-        return membersByConversation.getOrDefault(conversationId, Set.of()).contains(userId);
-    }
-
-    private void requireMembership(UUID conversationId, UUID userId) {
-        if (!conversations.containsKey(conversationId)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Conversation not found.");
+        String type = request.type().trim().toLowerCase();
+        if (!List.of("text", "voice").contains(type)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported message type.");
         }
-        if (!isMember(conversationId, userId)) {
+
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("id", request.id() == null ? UUID.randomUUID() : request.id());
+        row.put("conversation_id", request.conversationId());
+        row.put("sender_id", userId);
+        row.put("type", type);
+        row.put("body", request.body());
+        row.put("media_path", request.mediaPath());
+        return toMessage(database.first(database.insert("messages", row)));
+    }
+
+    public void requireMembership(UUID conversationId, UUID userId) {
+        JsonNode membership = database.first(database.query(
+                "conversation_members",
+                Map.of(
+                        "conversation_id", "eq." + conversationId,
+                        "user_id", "eq." + userId,
+                        "select", "conversation_id",
+                        "limit", "1"
+                )
+        ));
+        if (membership == null) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not a member of this conversation.");
         }
     }
 
-    private Message systemMessage(UUID conversationId, String body) {
-        return new Message(
-                UUID.randomUUID(),
-                conversationId,
-                null,
-                "text",
-                body,
-                null,
-                Instant.now()
+    private Conversation toConversation(JsonNode row) {
+        if (row == null) throw new IllegalStateException("Supabase did not return a conversation.");
+        return new Conversation(
+                UUID.fromString(row.path("id").asText()),
+                row.path("type").asText(),
+                row.path("title").asText("Untitled chat"),
+                UUID.fromString(row.path("created_by").asText()),
+                Instant.parse(row.path("created_at").asText())
         );
     }
 
-    private void seedConversation(
-            String id,
-            String type,
-            String title,
-            Set<UUID> members,
-            String welcome
-    ) {
-        UUID conversationId = UUID.fromString(id);
-        Instant createdAt = Instant.now();
-        Conversation conversation = new Conversation(conversationId, type, title, DEMO_USER_ID, createdAt);
-        conversations.put(conversationId, conversation);
-        membersByConversation.put(conversationId, ConcurrentHashMap.newKeySet());
-        membersByConversation.get(conversationId).addAll(members);
-        messagesByConversation.put(conversationId, new CopyOnWriteArrayList<>(List.of(
-                new Message(UUID.randomUUID(), conversationId, null, "text", welcome, null, createdAt)
-        )));
+    private Message toMessage(JsonNode row) {
+        return new Message(
+                UUID.fromString(row.path("id").asText()),
+                UUID.fromString(row.path("conversation_id").asText()),
+                uuidOrNull(row, "sender_id"),
+                row.path("type").asText(),
+                textOrNull(row, "body"),
+                resolveMessageMedia(row),
+                Instant.parse(row.path("created_at").asText())
+        );
+    }
+
+    private String resolveMessageMedia(JsonNode row) {
+        String path = textOrNull(row, "media_path");
+        return "voice".equals(row.path("type").asText())
+                ? storageService.resolveUrl("voice-messages", path)
+                : path;
+    }
+
+    private UUID uuidOrNull(JsonNode row, String field) {
+        String value = textOrNull(row, field);
+        return value == null || value.isBlank() ? null : UUID.fromString(value);
+    }
+
+    private String textOrNull(JsonNode row, String field) {
+        JsonNode value = row.get(field);
+        return value == null || value.isNull() ? null : value.asText();
     }
 }

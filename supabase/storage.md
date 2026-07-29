@@ -1,8 +1,8 @@
 # Storage Buckets
 
-Create these private Supabase Storage buckets:
+The app uses these Supabase Storage buckets:
 
-- `avatars` for profile images
+- `avatars` for public profile images
 - `voice-messages` for audio clips
 - `stories` for story images and videos
 
@@ -14,6 +14,9 @@ stories/{user-id}/{file-id}.jpg
 avatars/{user-id}/{file-id}.jpg
 ```
 
-Users should only upload to paths prefixed with their own auth user ID. The frontend generates a
-signed URL after upload. In production, generate short-lived voice-message URLs in the Java backend
-after checking conversation membership. Do not make private voice messages permanently public.
+The frontend sends media to the authenticated Java endpoint at `/api/media/{bucket}`. The backend
+validates the file, stores it with the Supabase server secret, and prefixes the path with the
+authenticated user's ID. Avatar URLs are public. Voice messages and stories use signed URLs and
+remain private.
+
+Never put `SUPABASE_SECRET_KEY` in the frontend environment or browser code.

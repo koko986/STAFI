@@ -2,13 +2,9 @@ import { KeyRound, Mail, Phone } from "lucide-react";
 import { useState } from "react";
 import { supabase } from "../lib/supabase";
 
-type Props = {
-  onDemo: () => void;
-};
-
 type AuthMode = "sign-in" | "sign-up";
 
-export function Login({ onDemo }: Props) {
+export function Login() {
   const [authMode, setAuthMode] = useState<AuthMode>("sign-in");
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
@@ -163,9 +159,6 @@ export function Login({ onDemo }: Props) {
             </button>
           )}
         </form>
-        <button className="secondary-button" type="button" onClick={onDemo} disabled={busy}>
-          Explore demo
-        </button>
         {status && <p className="status" role="status">{status}</p>}
       </section>
     </main>

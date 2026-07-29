@@ -1,11 +1,19 @@
 server:
   port: 8080
 
+logging:
+  file:
+    name: ${LOGGING_FILE_NAME:../.runlogs/backend.log}
+
 spring:
   config:
     import: optional:file:.env[.properties]
   application:
     name: chat-api
+  servlet:
+    multipart:
+      max-file-size: 25MB
+      max-request-size: 26MB
 
 app:
   security:

@@ -38,7 +38,7 @@ public class ProfileController {
 
     @GetMapping("/profiles/search")
     public List<Profile> search(
-            @RequestParam(defaultValue = "") String q,
+            @RequestParam(name = "q", defaultValue = "") String q,
             @AuthenticationPrincipal Jwt jwt
     ) {
         return profileService.search(q, userContext.requireUserId(jwt));
