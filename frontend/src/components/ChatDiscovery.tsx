@@ -1,6 +1,26 @@
-import { Check, MessageCircle, Plus, Search, UserRound, Users, X } from "lucide-react";
+import {
+  Check,
+  Clock3,
+  MessageCircle,
+  Plus,
+  Search,
+  UserCheck,
+  UserMinus,
+  UserPlus,
+  UserRound,
+  Users,
+  X
+} from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { apiGet, type Conversation, type Profile } from "../lib/api";
+import {
+  apiDelete,
+  apiGet,
+  apiPost,
+  apiPut,
+  type Connection,
+  type Conversation,
+  type Profile
+} from "../lib/api";
 import { ConversationList } from "./ConversationList";
 
 type Props = {
@@ -8,6 +28,7 @@ type Props = {
   activeId?: string;
   onSelect: (conversation: Conversation) => void;
   onStartDirect: (profile: Profile) => Promise<void>;
+  onViewProfile: (profile: Profile) => void;
   onCreateGroup: (title: string, memberIds: string[]) => Promise<void>;
   fallbackPeople?: Profile[];
 };
@@ -17,6 +38,7 @@ export function ChatDiscovery({
   activeId,
   onSelect,
   onStartDirect,
+  onViewProfile,
   onCreateGroup,
   fallbackPeople = []
 }: Props) {
@@ -29,6 +51,8 @@ export function ChatDiscovery({
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [openingProfileId, setOpeningProfileId] = useState<string>();
+  const [connections, setConnections] = useState<Connection[]>([]);
+  const [connectionBusyId, setConnectionBusyId] = useState<string>();
   const [status, setStatus] = useState("");
 
   const normalizedQuery = query.trim().replace(/^@+/, "");
@@ -73,6 +97,67 @@ export function ChatDiscovery({
     };
   }, [fallbackPeople, normalizedQuery]);
 
+  useEffect(() => {
+    apiGet<Connection[]>("/api/connections")
+      .then(setConnections)
+      .catch(() => setConnections(fallbackPeople.map((profile, index) => ({
+        id: `demo-connection-${index}`,
+        status: "accepted",
+        direction: "accepted",
+        profile,
+        updatedAt: new Date().toISOString()
+      }))));
+  }, [fallbackPeople]);
+
+  const incomingRequests = connections.filter((connection) => connection.direction === "incoming");
+  const contacts = connections.filter((connection) => connection.status === "accepted");
+
+  function connectionFor(profileId: string) {
+    return connections.find((connection) => connection.profile.id === profileId);
+  }
+
+  async function requestConnection(profile: Profile) {
+    setConnectionBusyId(profile.id);
+    setStatus("");
+    try {
+      const saved = await apiPost<Connection>("/api/connections", { profileId: profile.id });
+      setConnections((current) => [
+        saved,
+        ...current.filter((connection) => connection.id !== saved.id)
+      ]);
+    } catch {
+      setStatus(`Could not add @${profile.username} right now.`);
+    } finally {
+      setConnectionBusyId(undefined);
+    }
+  }
+
+  async function acceptConnection(connection: Connection) {
+    setConnectionBusyId(connection.profile.id);
+    setStatus("");
+    try {
+      const saved = await apiPut<Connection>(`/api/connections/${connection.id}/accept`, {});
+      setConnections((current) => current.map((item) => item.id === saved.id ? saved : item));
+    } catch {
+      setStatus(`Could not accept @${connection.profile.username}.`);
+    } finally {
+      setConnectionBusyId(undefined);
+    }
+  }
+
+  async function removeConnection(connection: Connection) {
+    setConnectionBusyId(connection.profile.id);
+    setStatus("");
+    try {
+      await apiDelete(`/api/connections/${connection.id}`);
+      setConnections((current) => current.filter((item) => item.id !== connection.id));
+    } catch {
+      setStatus(`Could not update @${connection.profile.username}.`);
+    } finally {
+      setConnectionBusyId(undefined);
+    }
+  }
+
   async function startDirect(profile: Profile) {
     setOpeningProfileId(profile.id);
     setStatus("");
@@ -92,11 +177,10 @@ export function ChatDiscovery({
     setStatus("");
     setSelectedIds([]);
     setGroupTitle("");
-    try {
-      setGroupPeople(await apiGet<Profile[]>("/api/profiles/search"));
-    } catch {
-      setGroupPeople(fallbackPeople);
-      if (!fallbackPeople.length) setStatus("Could not load people for this group.");
+    const contactProfiles = contacts.map((connection) => connection.profile);
+    setGroupPeople(contactProfiles.length ? contactProfiles : fallbackPeople);
+    if (!contactProfiles.length && !fallbackPeople.length) {
+      setStatus("Add a contact before creating a group.");
     }
   }
 
@@ -162,28 +246,141 @@ export function ChatDiscovery({
               {searching && <small>Searching...</small>}
             </div>
             {people.map((profile) => (
-              <button
+              <div
                 className="person-result"
-                type="button"
                 key={profile.id}
-                onClick={() => startDirect(profile)}
-                disabled={Boolean(openingProfileId)}
               >
-                <span className="avatar">
-                  {profile.avatarPath ? <img src={profile.avatarPath} alt="" /> : <UserRound size={18} />}
-                </span>
-                <span>
-                  <strong>{profile.displayName}</strong>
-                  <small>@{profile.username}</small>
-                  {profile.bio && <small className="person-bio">{profile.bio}</small>}
-                </span>
-                {openingProfileId === profile.id
-                  ? <small className="opening-chat">Opening...</small>
-                  : <MessageCircle size={17} />}
-              </button>
+                <button
+                  className="person-main"
+                  type="button"
+                  onClick={() => onViewProfile(profile)}
+                  disabled={Boolean(openingProfileId)}
+                >
+                  <span className="avatar">
+                    {profile.avatarPath ? <img src={profile.avatarPath} alt="" /> : <UserRound size={18} />}
+                  </span>
+                  <span>
+                    <strong>{profile.displayName}</strong>
+                    <small>@{profile.username}</small>
+                    {profile.bio && <small className="person-bio">{profile.bio}</small>}
+                  </span>
+                </button>
+                <button
+                  className="connection-action"
+                  type="button"
+                  title={
+                    connectionFor(profile.id)?.status === "accepted"
+                      ? "Contact"
+                      : connectionFor(profile.id)?.direction === "incoming"
+                        ? "Accept contact request"
+                        : connectionFor(profile.id)?.direction === "outgoing"
+                          ? "Request sent"
+                          : "Add contact"
+                  }
+                  disabled={
+                    connectionBusyId === profile.id
+                    || connectionFor(profile.id)?.direction === "outgoing"
+                  }
+                  onClick={() => {
+                    const connection = connectionFor(profile.id);
+                    if (connection?.direction === "incoming") acceptConnection(connection);
+                    else if (!connection) requestConnection(profile);
+                  }}
+                >
+                  {connectionBusyId === profile.id
+                    ? <Clock3 size={17} />
+                    : connectionFor(profile.id)?.status === "accepted"
+                      ? <UserCheck size={17} />
+                      : connectionFor(profile.id)?.direction === "outgoing"
+                        ? <Clock3 size={17} />
+                        : <UserPlus size={17} />}
+                </button>
+                <button
+                  className="message-person"
+                  type="button"
+                  title="Message"
+                  onClick={() => startDirect(profile)}
+                  disabled={Boolean(openingProfileId)}
+                >
+                  {openingProfileId === profile.id
+                    ? <Clock3 size={17} />
+                    : <MessageCircle size={17} />}
+                </button>
+              </div>
             ))}
             {!searching && people.length === 0 && <p className="empty-note">No people found.</p>}
             {status && !groupOpen && <p className="discovery-status" role="status">{status}</p>}
+          </section>
+        )}
+
+        {!normalizedQuery && incomingRequests.length > 0 && (
+          <section className="connection-results" aria-label="Contact requests">
+            <div className="section-label"><span>Contact requests</span></div>
+            {incomingRequests.map((connection) => (
+              <div className="contact-row" key={connection.id}>
+                <span className="avatar">
+                  {connection.profile.avatarPath
+                    ? <img src={connection.profile.avatarPath} alt="" />
+                    : <UserRound size={18} />}
+                </span>
+                <span>
+                  <strong>{connection.profile.displayName}</strong>
+                  <small>@{connection.profile.username}</small>
+                </span>
+                <button
+                  type="button"
+                  title="Accept"
+                  onClick={() => acceptConnection(connection)}
+                  disabled={connectionBusyId === connection.profile.id}
+                >
+                  <Check size={17} />
+                </button>
+                <button
+                  type="button"
+                  title="Decline"
+                  onClick={() => removeConnection(connection)}
+                  disabled={connectionBusyId === connection.profile.id}
+                >
+                  <X size={17} />
+                </button>
+              </div>
+            ))}
+          </section>
+        )}
+
+        {!normalizedQuery && contacts.length > 0 && (
+          <section className="connection-results" aria-label="Contacts">
+            <div className="section-label"><span>Contacts</span><small>{contacts.length}</small></div>
+            {contacts.map((connection) => (
+              <div className="contact-row" key={connection.id}>
+                <button
+                  className="contact-main"
+                  type="button"
+                  onClick={() => onViewProfile(connection.profile)}
+                >
+                  <span className="avatar">
+                    {connection.profile.avatarPath
+                      ? <img src={connection.profile.avatarPath} alt="" />
+                      : <UserRound size={18} />}
+                  </span>
+                  <span>
+                    <strong>{connection.profile.displayName}</strong>
+                    <small>@{connection.profile.username}</small>
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  title="Remove contact"
+                  onClick={() => removeConnection(connection)}
+                  disabled={connectionBusyId === connection.profile.id}
+                >
+                  <UserMinus size={17} />
+                </button>
+                <button type="button" title="Message" onClick={() => startDirect(connection.profile)}>
+                  <MessageCircle size={17} />
+                </button>
+              </div>
+            ))}
           </section>
         )}
 

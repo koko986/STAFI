@@ -82,6 +82,19 @@ public class SupabaseDatabase {
         }
     }
 
+    public JsonNode delete(String table, Map<String, String> filters) {
+        requireConfigured();
+        try {
+            return restClient.delete()
+                    .uri(uri(table, filters))
+                    .header("Prefer", "return=representation")
+                    .retrieve()
+                    .body(JsonNode.class);
+        } catch (RestClientResponseException exception) {
+            throw translate(exception);
+        }
+    }
+
     public JsonNode rpc(String function, Object body) {
         requireConfigured();
         try {

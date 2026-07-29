@@ -134,6 +134,22 @@ public class StorageService {
         return signedUrl.startsWith("http") ? signedUrl : supabaseUrl + "/storage/v1" + signedUrl;
     }
 
+    public void delete(String bucket, String path) {
+        if (path == null || path.isBlank() || path.startsWith("http://") || path.startsWith("https://")) {
+            return;
+        }
+        requireConfigured();
+        if (!BUCKETS.containsKey(bucket)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported media bucket.");
+        }
+        restClient.delete()
+                .uri(supabaseUrl + "/storage/v1/object/" + bucket + "/" + path)
+                .header("apikey", serviceKey)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + serviceKey)
+                .retrieve()
+                .toBodilessEntity();
+    }
+
     private void requireConfigured() {
         if (supabaseUrl.isBlank() || serviceKey.isBlank()) {
             throw new ResponseStatusException(

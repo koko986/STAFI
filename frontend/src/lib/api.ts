@@ -37,6 +37,14 @@ export async function apiPut<T>(path: string, body: unknown): Promise<T> {
   return response.json();
 }
 
+export async function apiDelete(path: string): Promise<void> {
+  const response = await fetch(`${API_URL}${path}`, {
+    method: "DELETE",
+    headers: await authHeaders(false)
+  });
+  if (!response.ok) throw new Error(await response.text());
+}
+
 export async function apiUpload<T>(path: string, file: Blob, filename: string): Promise<T> {
   const formData = new FormData();
   formData.append("file", file, filename);
@@ -79,8 +87,36 @@ export type Message = {
 export type Story = {
   id: string;
   ownerId: string;
+  ownerName: string;
+  ownerAvatarPath?: string;
   mediaPath: string;
   caption?: string;
+  visibility: "contacts" | "public";
+  viewCount: number;
+  viewed: boolean;
+  reactions: Record<StoryReaction, number>;
+  ownReaction?: StoryReaction;
+  replies: StoryReply[];
   expiresAt: string;
   createdAt: string;
+};
+
+export type StoryReaction = "heart" | "fire" | "like" | "laugh" | "clap";
+
+export type StoryReply = {
+  id: string;
+  storyId: string;
+  senderId: string;
+  senderName: string;
+  senderAvatarPath?: string;
+  body: string;
+  createdAt: string;
+};
+
+export type Connection = {
+  id: string;
+  status: "pending" | "accepted";
+  direction: "incoming" | "outgoing" | "accepted";
+  profile: Profile;
+  updatedAt: string;
 };

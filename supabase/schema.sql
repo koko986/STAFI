@@ -86,6 +86,29 @@ create table if not exists public.stories (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.connections (
+  id uuid primary key default gen_random_uuid(),
+  requester_id uuid not null references public.profiles(id) on delete cascade,
+  recipient_id uuid not null references public.profiles(id) on delete cascade,
+  status text not null default 'pending' check (status in ('pending', 'accepted')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  check (requester_id <> recipient_id)
+);
+
+create unique index if not exists connections_unique_pair_idx
+on public.connections (
+  least(requester_id, recipient_id),
+  greatest(requester_id, recipient_id)
+);
+
+create table if not exists public.story_views (
+  story_id uuid not null references public.stories(id) on delete cascade,
+  viewer_id uuid not null references public.profiles(id) on delete cascade,
+  viewed_at timestamptz not null default now(),
+  primary key (story_id, viewer_id)
+);
+
 create table if not exists public.ai_events (
   id uuid primary key default gen_random_uuid(),
   requester_id uuid not null references public.profiles(id) on delete cascade,
@@ -110,6 +133,11 @@ $$;
 drop trigger if exists profiles_set_updated_at on public.profiles;
 create trigger profiles_set_updated_at
   before update on public.profiles
+  for each row execute procedure public.set_updated_at();
+
+drop trigger if exists connections_set_updated_at on public.connections;
+create trigger connections_set_updated_at
+  before update on public.connections
   for each row execute procedure public.set_updated_at();
 
 create or replace function public.handle_new_user()
@@ -193,16 +221,41 @@ as $$
   );
 $$;
 
+create or replace function public.are_contacts(
+  first_user_id uuid,
+  second_user_id uuid
+)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select first_user_id = second_user_id or exists (
+    select 1
+    from public.connections
+    where status = 'accepted'
+      and (
+        (requester_id = first_user_id and recipient_id = second_user_id)
+        or (requester_id = second_user_id and recipient_id = first_user_id)
+      )
+  );
+$$;
+
 revoke all on function public.is_conversation_member(uuid, uuid) from public;
 revoke all on function public.can_manage_conversation(uuid, uuid) from public;
+revoke all on function public.are_contacts(uuid, uuid) from public;
 grant execute on function public.is_conversation_member(uuid, uuid) to authenticated, service_role;
 grant execute on function public.can_manage_conversation(uuid, uuid) to authenticated, service_role;
+grant execute on function public.are_contacts(uuid, uuid) to authenticated, service_role;
 
 alter table public.profiles enable row level security;
 alter table public.conversations enable row level security;
 alter table public.conversation_members enable row level security;
 alter table public.messages enable row level security;
 alter table public.stories enable row level security;
+alter table public.connections enable row level security;
+alter table public.story_views enable row level security;
 alter table public.ai_events enable row level security;
 
 grant usage on schema public to authenticated, service_role;
@@ -211,9 +264,12 @@ grant select, insert, update, delete on public.conversations to authenticated;
 grant select, insert, update, delete on public.conversation_members to authenticated;
 grant select, insert, update, delete on public.messages to authenticated;
 grant select, insert, update, delete on public.stories to authenticated;
+grant select, insert, update, delete on public.connections to authenticated;
+grant select, insert, delete on public.story_views to authenticated;
 grant select, insert on public.ai_events to authenticated;
 grant all on public.profiles, public.conversations, public.conversation_members,
-  public.messages, public.stories, public.ai_events to service_role;
+  public.messages, public.stories, public.connections, public.story_views,
+  public.ai_events to service_role;
 
 drop policy if exists "profiles are visible to authenticated users" on public.profiles;
 create policy "profiles are visible to authenticated users"
@@ -324,10 +380,80 @@ using (owner_id = auth.uid())
 with check (owner_id = auth.uid());
 
 drop policy if exists "authenticated users can view unexpired stories" on public.stories;
-create policy "authenticated users can view unexpired stories"
+drop policy if exists "users can view allowed unexpired stories" on public.stories;
+create policy "users can view allowed unexpired stories"
 on public.stories for select
 to authenticated
-using (expires_at > now());
+using (
+  expires_at > now()
+  and (
+    owner_id = auth.uid()
+    or visibility = 'public'
+    or public.are_contacts(owner_id, auth.uid())
+  )
+);
+
+drop policy if exists "participants can view connections" on public.connections;
+create policy "participants can view connections"
+on public.connections for select
+to authenticated
+using (auth.uid() in (requester_id, recipient_id));
+
+drop policy if exists "users can request contacts" on public.connections;
+create policy "users can request contacts"
+on public.connections for insert
+to authenticated
+with check (requester_id = auth.uid() and status = 'pending');
+
+drop policy if exists "recipients can accept contact requests" on public.connections;
+create policy "recipients can accept contact requests"
+on public.connections for update
+to authenticated
+using (recipient_id = auth.uid())
+with check (recipient_id = auth.uid() and status = 'accepted');
+
+drop policy if exists "participants can remove connections" on public.connections;
+create policy "participants can remove connections"
+on public.connections for delete
+to authenticated
+using (auth.uid() in (requester_id, recipient_id));
+
+drop policy if exists "viewers can create story receipts" on public.story_views;
+create policy "viewers can create story receipts"
+on public.story_views for insert
+to authenticated
+with check (
+  viewer_id = auth.uid()
+  and exists (
+    select 1
+    from public.stories
+    where id = story_id
+      and expires_at > now()
+      and (
+        owner_id = auth.uid()
+        or visibility = 'public'
+        or public.are_contacts(owner_id, auth.uid())
+      )
+  )
+);
+
+drop policy if exists "owners and viewers can read story receipts" on public.story_views;
+create policy "owners and viewers can read story receipts"
+on public.story_views for select
+to authenticated
+using (
+  viewer_id = auth.uid()
+  or exists (
+    select 1 from public.stories
+    where id = story_id and owner_id = auth.uid()
+  )
+);
+
+drop policy if exists "viewers can remove own story receipts" on public.story_views;
+create policy "viewers can remove own story receipts"
+on public.story_views for delete
+to authenticated
+using (viewer_id = auth.uid());
 
 drop policy if exists "users can view own ai events" on public.ai_events;
 create policy "users can view own ai events"
@@ -356,6 +482,12 @@ on public.conversation_members(user_id, joined_at desc);
 create index if not exists messages_conversation_created_idx on public.messages(conversation_id, created_at desc);
 create index if not exists stories_owner_expires_idx on public.stories(owner_id, expires_at desc);
 create index if not exists stories_expires_idx on public.stories(expires_at);
+create index if not exists connections_requester_status_idx
+on public.connections(requester_id, status, updated_at desc);
+create index if not exists connections_recipient_status_idx
+on public.connections(recipient_id, status, updated_at desc);
+create index if not exists story_views_viewer_viewed_idx
+on public.story_views(viewer_id, viewed_at desc);
 create index if not exists ai_events_requester_created_idx on public.ai_events(requester_id, created_at desc);
 
 create or replace function public.ensure_ai_conversation(requester_id uuid)
@@ -572,3 +704,125 @@ grant execute on function public.ensure_ai_conversation(uuid) to service_role;
 grant execute on function public.start_direct_conversation(uuid, uuid) to service_role;
 grant execute on function public.create_group_conversation(uuid, text, uuid[]) to service_role;
 grant execute on function public.list_user_conversations(uuid) to service_role;
+
+create table if not exists public.story_reactions (
+  story_id uuid not null references public.stories(id) on delete cascade,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  emoji text not null check (emoji in ('heart', 'fire', 'like', 'laugh', 'clap')),
+  reacted_at timestamptz not null default now(),
+  primary key (story_id, user_id)
+);
+
+create table if not exists public.story_replies (
+  id uuid primary key default gen_random_uuid(),
+  story_id uuid not null references public.stories(id) on delete cascade,
+  sender_id uuid not null references public.profiles(id) on delete cascade,
+  body text not null check (char_length(btrim(body)) between 1 and 500),
+  created_at timestamptz not null default now()
+);
+
+alter table public.story_reactions enable row level security;
+alter table public.story_replies enable row level security;
+
+grant select, insert, update, delete on public.story_reactions to authenticated;
+grant select, insert, delete on public.story_replies to authenticated;
+grant all on public.story_reactions, public.story_replies to service_role;
+
+drop policy if exists "story viewers can read reactions" on public.story_reactions;
+create policy "story viewers can read reactions"
+on public.story_reactions for select
+to authenticated
+using (
+  exists (
+    select 1 from public.stories
+    where stories.id = story_reactions.story_id
+      and stories.expires_at > now()
+      and (
+        stories.owner_id = auth.uid()
+        or stories.visibility = 'public'
+        or public.are_contacts(stories.owner_id, auth.uid())
+      )
+  )
+);
+
+drop policy if exists "users can react to visible stories" on public.story_reactions;
+create policy "users can react to visible stories"
+on public.story_reactions for insert
+to authenticated
+with check (
+  user_id = auth.uid()
+  and exists (
+    select 1 from public.stories
+    where stories.id = story_reactions.story_id
+      and stories.owner_id <> auth.uid()
+      and stories.expires_at > now()
+      and (
+        stories.visibility = 'public'
+        or public.are_contacts(stories.owner_id, auth.uid())
+      )
+  )
+);
+
+drop policy if exists "users can change own story reactions" on public.story_reactions;
+create policy "users can change own story reactions"
+on public.story_reactions for update
+to authenticated
+using (user_id = auth.uid())
+with check (user_id = auth.uid());
+
+drop policy if exists "users can remove own story reactions" on public.story_reactions;
+create policy "users can remove own story reactions"
+on public.story_reactions for delete
+to authenticated
+using (user_id = auth.uid());
+
+drop policy if exists "participants can read private story replies" on public.story_replies;
+create policy "participants can read private story replies"
+on public.story_replies for select
+to authenticated
+using (
+  sender_id = auth.uid()
+  or exists (
+    select 1 from public.stories
+    where stories.id = story_replies.story_id
+      and stories.owner_id = auth.uid()
+  )
+);
+
+drop policy if exists "users can reply to visible stories" on public.story_replies;
+create policy "users can reply to visible stories"
+on public.story_replies for insert
+to authenticated
+with check (
+  sender_id = auth.uid()
+  and exists (
+    select 1 from public.stories
+    where stories.id = story_replies.story_id
+      and stories.owner_id <> auth.uid()
+      and stories.expires_at > now()
+      and (
+        stories.visibility = 'public'
+        or public.are_contacts(stories.owner_id, auth.uid())
+      )
+  )
+);
+
+drop policy if exists "participants can delete story replies" on public.story_replies;
+create policy "participants can delete story replies"
+on public.story_replies for delete
+to authenticated
+using (
+  sender_id = auth.uid()
+  or exists (
+    select 1 from public.stories
+    where stories.id = story_replies.story_id
+      and stories.owner_id = auth.uid()
+  )
+);
+
+create index if not exists story_reactions_story_reacted_idx
+on public.story_reactions(story_id, reacted_at desc);
+create index if not exists story_replies_story_created_idx
+on public.story_replies(story_id, created_at);
+create index if not exists story_replies_sender_created_idx
+on public.story_replies(sender_id, created_at desc);

@@ -3,11 +3,22 @@ import SockJS from "sockjs-client";
 import { useEffect, useMemo, useState } from "react";
 import { ChatDiscovery } from "./components/ChatDiscovery";
 import { ChatWindow } from "./components/ChatWindow";
+import { FriendProfile } from "./components/FriendProfile";
 import { Login } from "./components/Login";
 import { ProfileDetails } from "./components/ProfileDetails";
 import { ProfileOnboarding } from "./components/ProfileOnboarding";
 import { Stories } from "./components/Stories";
-import { apiGet, apiPost, apiPut, type Conversation, type Message, type Profile, type Story } from "./lib/api";
+import {
+  apiDelete,
+  apiGet,
+  apiPost,
+  apiPut,
+  type Conversation,
+  type Message,
+  type Profile,
+  type Story,
+  type StoryReaction
+} from "./lib/api";
 import { storeMedia, uploadMedia } from "./lib/media";
 import { isSupabaseConfigured, supabase } from "./lib/supabase";
 
@@ -44,6 +55,7 @@ export function App() {
   const [profile, setProfile] = useState<Profile>();
   const [profileReady, setProfileReady] = useState(!isSupabaseConfigured);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [friendProfile, setFriendProfile] = useState<Profile>();
   const [accountContact, setAccountContact] = useState(
     isSupabaseConfigured ? "" : "Demo account"
   );
@@ -126,7 +138,14 @@ export function App() {
           setActive((current) => current || fallbackConversations[0]);
         }
       });
-    apiGet<Story[]>("/api/stories").then(setStories).catch(() => undefined);
+    const loadStories = () => {
+      apiGet<Story[]>("/api/stories")
+        .then((items) => setStories(items.filter((story) => new Date(story.expiresAt).getTime() > Date.now())))
+        .catch(() => undefined);
+    };
+    loadStories();
+    const storyRefresh = window.setInterval(loadStories, 60_000);
+    return () => window.clearInterval(storyRefresh);
   }, [demoMode, loggedIn, profile?.onboarded]);
 
   useEffect(() => {
@@ -197,25 +216,62 @@ export function App() {
     }).catch(() => undefined);
   }
 
-  async function createStory(file: File) {
+  async function createStory(file: File, caption: string, visibility: Story["visibility"]) {
     const extension = file.name.split(".").pop() || (file.type.startsWith("video") ? "webm" : "jpg");
     const uploaded = await uploadMedia("stories", file, extension);
-    const localStory: Story = {
-      id: crypto.randomUUID(),
-      ownerId: "me",
-      mediaPath: uploaded.url,
-      caption: "My Story",
-      createdAt: new Date().toISOString(),
-      expiresAt: new Date(Date.now() + 86_400_000).toISOString()
-    };
-    setStories((current) => [...current, localStory]);
     const saved = await apiPost<Story>("/api/stories", {
       mediaPath: uploaded.path,
-      caption: "My Story"
-    }).catch(() => undefined);
-    if (saved) {
-      setStories((current) => [...current.filter((story) => story.id !== localStory.id), saved]);
+      caption,
+      visibility
+    });
+    setStories((current) => [saved, ...current]);
+  }
+
+  async function deleteStory(storyId: string) {
+    await apiDelete(`/api/stories/${storyId}`);
+    setStories((current) => current.filter((story) => story.id !== storyId));
+  }
+
+  async function viewStory(story: Story) {
+    const updated = await apiPost<Story>(`/api/stories/${story.id}/views`, {});
+    setStories((current) => current.map((item) => item.id === updated.id ? updated : item));
+    return updated;
+  }
+
+  async function reactToStory(story: Story, reaction: StoryReaction) {
+    const updated = await apiPut<Story>(`/api/stories/${story.id}/reaction`, { emoji: reaction });
+    setStories((current) => current.map((item) => item.id === updated.id ? updated : item));
+    return updated;
+  }
+
+  async function removeStoryReaction(story: Story) {
+    await apiDelete(`/api/stories/${story.id}/reaction`);
+    const reactions = { ...story.reactions };
+    if (story.ownReaction && reactions[story.ownReaction]) {
+      reactions[story.ownReaction] -= 1;
+      if (reactions[story.ownReaction] <= 0) delete reactions[story.ownReaction];
     }
+    const updated = { ...story, reactions, ownReaction: undefined };
+    setStories((current) => current.map((item) => item.id === updated.id ? updated : item));
+    return updated;
+  }
+
+  async function replyToStory(story: Story, body: string) {
+    const updated = await apiPost<Story>(`/api/stories/${story.id}/replies`, { body });
+    setStories((current) => current.map((item) => item.id === updated.id ? updated : item));
+    apiGet<Conversation[]>("/api/conversations")
+      .then(setConversations)
+      .catch(() => undefined);
+    return updated;
+  }
+
+  async function openFriendProfile(profileOrId: Profile | string) {
+    if (typeof profileOrId !== "string") {
+      setFriendProfile(profileOrId);
+      return;
+    }
+    const found = await apiGet<Profile>(`/api/profiles/${profileOrId}`).catch(() => undefined);
+    if (found) setFriendProfile(found);
   }
 
   async function askAi(action: "summarize" | "draft-reply") {
@@ -265,6 +321,7 @@ export function App() {
     setMessages([]);
     setStories([]);
     setProfileOpen(false);
+    setFriendProfile(undefined);
   }
 
   async function saveProfile(updatedProfile: Profile) {
@@ -371,12 +428,23 @@ export function App() {
           </button>
           <button onClick={signOut}>Sign out</button>
         </div>
-        <Stories stories={stories} onCreate={createStory} />
+        <Stories
+          stories={stories}
+          currentUserId={profile.id}
+          onCreate={createStory}
+          onDelete={deleteStory}
+          onViewed={viewStory}
+          onReact={reactToStory}
+          onRemoveReaction={removeStoryReaction}
+          onReply={replyToStory}
+          onViewProfile={(profileId) => openFriendProfile(profileId)}
+        />
         <ChatDiscovery
           conversations={conversations}
           activeId={active?.id}
           onSelect={setActive}
           onStartDirect={startDirect}
+          onViewProfile={(selectedProfile) => setFriendProfile(selectedProfile)}
           onCreateGroup={createGroup}
           fallbackPeople={demoMode ? demoPeople : noPeople}
         />
@@ -397,6 +465,11 @@ export function App() {
         open={profileOpen}
         onClose={() => setProfileOpen(false)}
         onSave={saveProfile}
+      />
+      <FriendProfile
+        profile={friendProfile}
+        onClose={() => setFriendProfile(undefined)}
+        onMessage={startDirect}
       />
     </main>
   );
