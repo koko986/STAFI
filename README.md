@@ -32,10 +32,12 @@ using the application.
 
 ## Run The Backend
 
-Set the variables shown in `backend/.env.example`, or leave `APP_SECURITY_ENABLED=false` for
-local demo mode.
+Create the local backend environment file before the first run. Git does not copy this file
+because it contains the private Supabase server key.
 
 ```powershell
+Copy-Item backend/.env.example backend/.env
+# Set SUPABASE_SECRET_KEY in backend/.env
 cd backend
 mvn spring-boot:run
 ```
@@ -45,8 +47,8 @@ so Spring validates Supabase JWTs.
 
 ## Run The Frontend
 
-Copy `frontend/.env.example` to `frontend/.env` and add your Supabase project values. Without
-Supabase values, the app opens directly in demo mode.
+The hosted Supabase URL and publishable key are built into this project because publishable keys
+are intended for browser use. A local `frontend/.env` is optional and can override those values.
 
 ```powershell
 cd frontend
@@ -55,6 +57,31 @@ npm run dev
 ```
 
 The frontend starts at `http://localhost:5173`.
+
+## Use Another Device
+
+There are two supported setups.
+
+For a full clone running on the second computer:
+
+```powershell
+git pull
+Copy-Item backend/.env.example backend/.env
+# Add SUPABASE_SECRET_KEY to backend/.env, then:
+.\start-chat.ps1
+```
+
+On macOS or Linux, use `cp backend/.env.example backend/.env`, then run the backend and frontend
+commands from the sections above. Never commit `backend/.env` or the secret key.
+
+To use one computer as the server, start the app there and open
+`http://SERVER_LAN_IP:5173` on the second device. The frontend automatically connects to port
+`8080` on that same server address. Allow inbound TCP ports `5173` and `8080` on the server's
+private-network firewall.
+
+For Google login from a LAN address, add the exact frontend address, for example
+`http://192.168.1.20:5173/**`, to **Supabase Dashboard > Authentication > URL Configuration >
+Redirect URLs**. Keep `http://localhost:5173/**` for computers that run their own clone.
 
 ## Configure Supabase
 

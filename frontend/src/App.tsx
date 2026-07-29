@@ -13,6 +13,7 @@ import {
   apiGet,
   apiPost,
   apiPut,
+  WS_URL,
   type Conversation,
   type Message,
   type Profile,
@@ -163,7 +164,7 @@ export function App() {
   useEffect(() => {
     if (!loggedIn || !active) return;
     const client = new Client({
-      webSocketFactory: () => new SockJS(import.meta.env.VITE_WS_URL || "http://localhost:8080/ws"),
+      webSocketFactory: () => new SockJS(WS_URL),
       reconnectDelay: 5000,
       onConnect: () => {
         client.subscribe(`/topic/conversations/${active.id}`, (frame) => {

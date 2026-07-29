@@ -1,6 +1,25 @@
 import { supabase } from "./supabase";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
+function adaptLocalAddress(configuredUrl: string | undefined, fallbackPort: number) {
+  const fallback = `${window.location.protocol}//${window.location.hostname}:${fallbackPort}`;
+  if (!configuredUrl) return fallback;
+  try {
+    const parsed = new URL(configuredUrl);
+    const configuredIsLocal = parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1";
+    const browserIsRemote = window.location.hostname !== "localhost"
+      && window.location.hostname !== "127.0.0.1";
+    if (configuredIsLocal && browserIsRemote) parsed.hostname = window.location.hostname;
+    return parsed.toString().replace(/\/$/, "");
+  } catch {
+    return configuredUrl.replace(/\/$/, "");
+  }
+}
+
+export const API_URL = adaptLocalAddress(import.meta.env.VITE_API_URL, 8080);
+export const WS_URL = adaptLocalAddress(
+  import.meta.env.VITE_WS_URL,
+  8080
+).replace(/\/ws$/, "") + "/ws";
 
 async function authHeaders(includeJsonContentType = true): Promise<Record<string, string>> {
   const { data } = await supabase.auth.getSession();
