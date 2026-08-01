@@ -3023,7 +3023,7 @@ h1 {
 }
 
 .conversation {
-  grid-template-columns: 62px minmax(0, 1fr);
+  grid-template-columns: 62px minmax(0, 1fr) auto;
   padding: 8px 8px;
 }
 
@@ -3049,6 +3049,11 @@ h1 {
   display: block;
   font-size: 17px;
   letter-spacing: 0;
+}
+
+.conversation.unread > span:nth-child(2) strong {
+  color: var(--app-ink);
+  font-weight: 900;
 }
 
 .conversation small {
@@ -3082,6 +3087,22 @@ h1 {
 
 .conversation.offline .presence-line i {
   background: #94a3b8;
+}
+
+.unread-badge {
+  min-width: 25px;
+  height: 25px;
+  display: inline-grid !important;
+  place-items: center;
+  align-self: center;
+  padding: 0 7px;
+  border-radius: 999px;
+  color: #ffffff !important;
+  font-size: 12px !important;
+  font-weight: 900;
+  line-height: 1;
+  background: linear-gradient(135deg, #18a8f2, #0f8fd8);
+  box-shadow: 0 10px 24px rgba(14, 165, 233, 0.3);
 }
 
 .section-label {
@@ -3468,7 +3489,7 @@ h1 {
 
   .conversation {
     min-height: 82px;
-    grid-template-columns: 68px minmax(0, 1fr);
+    grid-template-columns: 68px minmax(0, 1fr) auto;
     padding: 9px 0;
   }
 

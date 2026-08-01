@@ -121,6 +121,12 @@ export type Message = {
   deletedAt?: string;
 };
 
+export type PresenceEvent = {
+  userId: string;
+  online: boolean;
+  seenAt: string;
+};
+
 export type MessageReaction = "heart" | "fire" | "like" | "laugh" | "clap";
 
 export type ReadReceipt = {

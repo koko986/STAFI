@@ -34,6 +34,7 @@ import {
   type Conversation,
   type Message,
   type MessageReaction,
+  type PresenceEvent,
   type Profile,
   type ReadReceipt,
   type Story,
@@ -104,6 +105,9 @@ export function App() {
     isSupabaseConfigured ? undefined : fallbackConversations[0]
   );
   const [messages, setMessages] = useState<Message[]>([]);
+  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
+  const [presenceSeenAt, setPresenceSeenAt] = useState<Record<string, number>>({});
+  const [presenceTick, setPresenceTick] = useState(Date.now());
   const [stories, setStories] = useState<Story[]>([]);
 
   const aiConversations = useMemo(
@@ -122,6 +126,47 @@ export function App() {
     () => active ? messages.filter((message) => message.conversationId === active.id && !message.deletedAt) : [],
     [active, messages]
   );
+  const onlineUserIds = useMemo(() => {
+    const online = new Set<string>();
+    Object.entries(presenceSeenAt).forEach(([userId, seenAt]) => {
+      if (seenAt && presenceTick - seenAt < 25_000) online.add(userId);
+    });
+    return online;
+  }, [presenceSeenAt, presenceTick]);
+  const unreadTotal = useMemo(
+    () => Object.values(unreadCounts).reduce((total, count) => total + count, 0),
+    [unreadCounts]
+  );
+
+  function isOwnMessage(message: Message) {
+    return message.senderId === "me" || message.senderId === profile?.id;
+  }
+
+  function clearUnread(conversationId: string) {
+    setUnreadCounts((current) => {
+      if (!current[conversationId]) return current;
+      const next = { ...current };
+      delete next[conversationId];
+      return next;
+    });
+  }
+
+  function openConversation(conversation: Conversation) {
+    setActive(conversation);
+    clearUnread(conversation.id);
+  }
+
+  function notifyIncomingMessage(conversation: Conversation, message: Message) {
+    if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
+    const preview = message.type === "voice"
+      ? "Voice message"
+      : message.body || "New message";
+    new Notification(conversation.title, {
+      body: preview,
+      tag: conversation.id,
+      silent: false
+    });
+  }
 
   function upsertMessage(message: Message, preserveViewerState = false) {
     setMessages((current) => {
@@ -215,6 +260,31 @@ export function App() {
   }, [demoMode, loggedIn]);
 
   useEffect(() => {
+    if (!loggedIn || typeof Notification === "undefined" || Notification.permission !== "default") return;
+    Notification.requestPermission().catch(() => undefined);
+  }, [loggedIn]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setPresenceTick(Date.now()), 5000);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    document.title = unreadTotal > 0 ? `(${unreadTotal}) Java Chat` : "Java Chat";
+    return () => {
+      document.title = "Java Chat";
+    };
+  }, [unreadTotal]);
+
+  useEffect(() => {
+    const clearVisibleConversation = () => {
+      if (!document.hidden && active?.id) clearUnread(active.id);
+    };
+    document.addEventListener("visibilitychange", clearVisibleConversation);
+    return () => document.removeEventListener("visibilitychange", clearVisibleConversation);
+  }, [active?.id]);
+
+  useEffect(() => {
     if (!loggedIn || demoMode) return;
     supabase.auth.getUser()
       .then(({ data }) => setAccountContact(data.user?.phone || data.user?.email || ""))
@@ -250,7 +320,10 @@ export function App() {
     const loadMessages = () => {
       apiGet<Message[]>(`/api/conversations/${active.id}/messages`)
         .then((items) => {
-          if (mounted) mergeConversationMessages(active.id, items);
+          if (mounted) {
+            mergeConversationMessages(active.id, items);
+            if (!document.hidden) clearUnread(active.id);
+          }
         })
         .catch(() => undefined);
     };
@@ -264,6 +337,7 @@ export function App() {
 
   useEffect(() => {
     if (!loggedIn || !conversations.length) return;
+    let presenceTimer: number | undefined;
     const client = new Client({
       webSocketFactory: () => new SockJS(WS_URL),
       reconnectDelay: 1000,
@@ -271,10 +345,42 @@ export function App() {
       heartbeatIncoming: 10000,
       heartbeatOutgoing: 10000,
       onConnect: () => {
+        const publishPresence = (online: boolean) => {
+          if (!profile?.id) return;
+          client.publish({
+            destination: "/app/presence",
+            body: JSON.stringify({ userId: profile.id, online })
+          });
+        };
+        client.subscribe("/topic/presence", (frame) => {
+          const event = JSON.parse(frame.body) as PresenceEvent;
+          if (!event.userId || event.userId === profile?.id) return;
+          setPresenceSeenAt((current) => {
+            const next = { ...current };
+            if (event.online) next[event.userId] = Date.parse(event.seenAt) || Date.now();
+            else delete next[event.userId];
+            return next;
+          });
+        });
+        publishPresence(true);
+        if (presenceTimer) window.clearInterval(presenceTimer);
+        presenceTimer = window.setInterval(() => publishPresence(true), 10000);
         conversations.forEach((conversation) => {
           client.subscribe(`/topic/conversations/${conversation.id}`, (frame) => {
             const incoming = JSON.parse(frame.body) as Message;
             upsertMessage(incoming, true);
+            if (!isOwnMessage(incoming) && !incoming.deletedAt) {
+              if (incoming.senderId) {
+                setPresenceSeenAt((current) => ({ ...current, [incoming.senderId]: Date.now() }));
+              }
+              if (active?.id !== incoming.conversationId || document.hidden) {
+                setUnreadCounts((current) => ({
+                  ...current,
+                  [incoming.conversationId]: (current[incoming.conversationId] || 0) + 1
+                }));
+                notifyIncomingMessage(conversation, incoming);
+              }
+            }
           });
           client.subscribe(`/topic/conversations/${conversation.id}/receipts`, (frame) => {
             const receipt = JSON.parse(frame.body) as ReadReceipt;
@@ -301,9 +407,16 @@ export function App() {
     });
     client.activate();
     return () => {
+      if (presenceTimer) window.clearInterval(presenceTimer);
+      if (profile?.id && client.connected) {
+        client.publish({
+          destination: "/app/presence",
+          body: JSON.stringify({ userId: profile.id, online: false })
+        });
+      }
       client.deactivate();
     };
-  }, [conversations, loggedIn, profile?.id]);
+  }, [active?.id, conversations, loggedIn, profile?.id]);
 
   async function send(body: string, replyToMessageId?: string) {
     if (!active) return;
@@ -561,6 +674,8 @@ export function App() {
     setConversations([]);
     setActive(undefined);
     setMessages([]);
+    setUnreadCounts({});
+    setPresenceSeenAt({});
     setStories([]);
     setProfileOpen(false);
     setFriendProfile(undefined);
@@ -592,7 +707,7 @@ export function App() {
     setConversations((current) =>
       current.some((item) => item.id === conversation.id) ? current : [conversation, ...current]
     );
-    setActive(conversation);
+    openConversation(conversation);
     setMobileChatOpen(true);
   }
 
@@ -601,7 +716,7 @@ export function App() {
       ? { id: crypto.randomUUID(), type: "group", title }
       : await apiPost<Conversation>("/api/conversations/groups", { title, memberIds });
     setConversations((current) => [conversation, ...current]);
-    setActive(conversation);
+    openConversation(conversation);
     setMobileChatOpen(true);
   }
 
@@ -732,8 +847,10 @@ export function App() {
               conversations={filteredConversations}
               activeId={active?.id}
               searchOpen={searchOpen}
+              unreadCounts={unreadCounts}
+              onlineUserIds={onlineUserIds}
               onSelect={(conversation) => {
-                setActive(conversation);
+                openConversation(conversation);
                 setFriendProfile(undefined);
                 setMobileChatOpen(true);
               }}
@@ -749,7 +866,7 @@ export function App() {
             conversations={aiConversations}
             activeId={active?.id}
             onSelect={(conversation) => {
-              setActive(conversation);
+              openConversation(conversation);
               setMobileChatOpen(true);
             }}
             onSummarize={() => askAi("summarize")}
