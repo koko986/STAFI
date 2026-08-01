@@ -3466,6 +3466,81 @@ h1 {
   display: block;
 }
 
+.ai-assistant-panel {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.18);
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.12);
+  backdrop-filter: blur(24px) saturate(170%);
+}
+
+.ai-assistant-panel label {
+  display: grid;
+  gap: 7px;
+  color: var(--app-muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.ai-assistant-panel textarea {
+  width: 100%;
+  min-width: 0;
+  resize: vertical;
+  padding: 11px 12px;
+  border: 1px solid var(--glass-border);
+  border-radius: 14px;
+  outline: 0;
+  color: var(--app-ink);
+  background: rgba(255, 255, 255, 0.26);
+  font: inherit;
+  line-height: 1.4;
+}
+
+.ai-assistant-panel textarea:focus {
+  border-color: rgba(16, 167, 255, 0.68);
+  box-shadow: 0 0 0 3px rgba(16, 167, 255, 0.14);
+}
+
+.ai-assistant-actions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.ai-assistant-actions button {
+  min-width: 0;
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 14px;
+  color: var(--app-ink);
+  background: rgba(255, 255, 255, 0.24);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.ai-assistant-actions button.active {
+  color: #ffffff;
+  background: rgba(16, 167, 255, 0.84);
+}
+
+.ai-assistant-actions button:disabled {
+  opacity: 0.5;
+}
+
+.ai-assistant-status {
+  margin: 0;
+  color: var(--app-muted);
+  font-size: 12px;
+}
+
 .glass-list {
   overflow: hidden;
   border-radius: 24px;

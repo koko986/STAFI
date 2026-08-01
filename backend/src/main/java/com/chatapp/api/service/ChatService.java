@@ -140,6 +140,29 @@ public class ChatService {
         return prepareNewMessage(stored);
     }
 
+    public boolean isAiConversation(UUID conversationId) {
+        JsonNode row = database.first(database.query(
+                "conversations",
+                Map.of(
+                        "id", "eq." + conversationId,
+                        "select", "type",
+                        "limit", "1"
+                )
+        ));
+        return row != null && "ai_private".equals(row.path("type").asText());
+    }
+
+    public Message addAssistantMessage(UUID conversationId, String body) {
+        if (!isAiConversation(conversationId)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "AI messages can be saved only in AI chats.");
+        }
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("conversation_id", conversationId);
+        row.put("type", "ai");
+        row.put("body", body);
+        return prepareNewMessage(toMessage(database.first(insertMessage(row))));
+    }
+
     public Message deleteMessage(UUID messageId, UUID userId) {
         JsonNode row = findMessageRow(messageId);
         if (row == null || !row.path("deleted_at").isNull()) {

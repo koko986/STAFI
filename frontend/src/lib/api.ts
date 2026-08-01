@@ -106,7 +106,7 @@ export type Conversation = {
 export type Message = {
   id: string;
   conversationId: string;
-  senderId: string;
+  senderId?: string;
   type: "text" | "voice" | "ai";
   body?: string;
   mediaPath?: string;

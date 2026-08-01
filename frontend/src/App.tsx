@@ -6,14 +6,18 @@ import {
   LogOut,
   Menu,
   MessageCircle,
+  Mic,
   Moon,
   Palette,
   Search,
+  Send,
   Settings,
   ShieldCheck,
   Sparkles,
+  Square,
   Sun,
-  UserRound
+  UserRound,
+  Volume2
 } from "lucide-react";
 import SockJS from "sockjs-client";
 import { useEffect, useMemo, useState } from "react";
@@ -67,6 +71,7 @@ const demoPeople: Profile[] = [
 const noPeople: Profile[] = [];
 type AppTab = "chats" | "ai" | "settings" | "profile";
 type ChatFilter = "all" | "direct" | "group" | "ai";
+type AiApiResponse = { text: string; message?: Message };
 
 function applyLocalReaction(message: Message, reaction?: MessageReaction): Message {
   const previous = message.ownReaction;
@@ -387,8 +392,9 @@ export function App() {
             const incoming = JSON.parse(frame.body) as Message;
             upsertMessage(incoming, true);
             if (!isOwnMessage(incoming) && !incoming.deletedAt) {
-              if (incoming.senderId) {
-                setPresenceSeenAt((current) => ({ ...current, [incoming.senderId]: Date.now() }));
+              const senderId = incoming.senderId;
+              if (senderId) {
+                setPresenceSeenAt((current) => ({ ...current, [senderId]: Date.now() }));
               }
               if (active?.id !== incoming.conversationId || document.hidden) {
                 setUnreadCounts((current) => ({
@@ -437,6 +443,10 @@ export function App() {
 
   async function send(body: string, replyToMessageId?: string) {
     if (!active) return;
+    if (active.type === "ai_private") {
+      await sendAiMessage(body, replyToMessageId);
+      return;
+    }
     const replyingTo = replyToMessageId
       ? activeMessages.find((message) => message.id === replyToMessageId)
       : undefined;
@@ -462,6 +472,66 @@ export function App() {
       replyToMessageId
     }).catch(() => undefined);
     if (saved) upsertMessage(saved);
+  }
+
+  async function sendAiMessage(body: string, replyToMessageId?: string) {
+    if (!active || active.type !== "ai_private") return undefined;
+    const replyingTo = replyToMessageId
+      ? activeMessages.find((message) => message.id === replyToMessageId)
+      : undefined;
+    const id = crypto.randomUUID();
+    const optimistic: Message = {
+      id,
+      conversationId: active.id,
+      senderId: "me",
+      type: "text",
+      body,
+      replyToMessageId,
+      replyPreview: replyingTo?.type === "voice" ? "Voice message" : replyingTo?.body,
+      reactions: {},
+      status: "sent",
+      createdAt: new Date().toISOString()
+    };
+    setMessages((current) => [...current, optimistic]);
+    const saved = await apiPost<Message>("/api/messages", {
+      id,
+      conversationId: active.id,
+      type: "text",
+      body,
+      replyToMessageId
+    }).catch(() => undefined);
+    if (saved) upsertMessage(saved);
+
+    const context = [...activeMessages, saved || optimistic]
+      .filter((message) => message.body)
+      .slice(-24)
+      .map((message) => {
+        const speaker = message.type === "ai"
+          ? "AI"
+          : message.senderId === "me" || message.senderId === profile?.id
+            ? "Me"
+            : active.title;
+        return `${speaker}: ${message.body}`;
+      })
+      .join("\n");
+    const response = await apiPost<AiApiResponse>("/api/ai/chat", {
+      conversationId: active.id,
+      action: "chat",
+      prompt: context
+    }).catch((): AiApiResponse => ({ text: "AI assistant is ready once the Java backend and AI provider are configured." }));
+    if (response.message) {
+      upsertMessage(response.message);
+    } else {
+      upsertMessage({
+        id: crypto.randomUUID(),
+        conversationId: active.id,
+        senderId: "ai",
+        type: "ai",
+        body: response.text,
+        createdAt: new Date().toISOString()
+      });
+    }
+    return response.text;
   }
 
   async function sendVoice(voice: Blob, replyToMessageId?: string) {
@@ -636,21 +706,51 @@ export function App() {
     if (found) setFriendProfile(found);
   }
 
-  async function askAi(action: "summarize" | "draft-reply") {
-    if (!active) return;
-    const prompt = activeMessages
+  async function askAi(action: "summarize" | "draft-reply" | "question" | "chat", promptOverride?: string) {
+    if (!active) return undefined;
+    if ((action === "chat" || action === "question") && promptOverride && active.type === "ai_private") {
+      return sendAiMessage(promptOverride);
+    }
+    const context = activeMessages
       .filter((message) => message.body)
       .slice(-20)
-      .map((message) => message.body)
+      .map((message) => {
+        const speaker = message.senderId === "ai"
+          ? "AI"
+          : message.senderId === "me" || message.senderId === profile?.id
+            ? "Me"
+            : active.title;
+        return `${speaker}: ${message.body}`;
+      })
       .join("\n") || "No messages yet.";
-    const response = await apiPost<{ text: string }>(`/api/ai/${action}`, {
+    const prompt = promptOverride
+      ? `Chat context:\n${context}\n\nUser request:\n${promptOverride}`
+      : context;
+    if (promptOverride && action !== "question") {
+      setMessages((current) => [
+        ...current,
+        {
+          id: crypto.randomUUID(),
+          conversationId: active.id,
+          senderId: "me",
+          type: "text",
+          body: promptOverride,
+          status: "sent",
+          createdAt: new Date().toISOString()
+        }
+      ]);
+    }
+    const endpoint = action === "chat" ? "chat" : action;
+    const response = await apiPost<{ text: string }>(`/api/ai/${endpoint}`, {
       conversationId: active.id,
       action,
       prompt
     }).catch(() => ({
       text: action === "summarize"
         ? "AI summary is ready once the Java backend is running."
-        : "Suggested reply: Thanks for the update. I’ll get back to you shortly."
+        : action === "draft-reply"
+          ? "Suggested reply: Thanks for the update. I’ll get back to you shortly."
+          : "AI assistant is ready once the Java backend is running."
     }));
 
     setMessages((current) => [
@@ -664,6 +764,7 @@ export function App() {
         createdAt: new Date().toISOString()
       }
     ]);
+    return response.text;
   }
 
   function toggleTheme() {
@@ -678,6 +779,9 @@ export function App() {
     setFriendProfile(undefined);
     if (tab !== "chats") setSearchOpen(false);
     if (tab === "profile") setProfileOpen(false);
+    if (tab === "ai" && aiConversations[0]) {
+      setActive((current) => current?.type === "ai_private" ? current : aiConversations[0]);
+    }
   }
 
   function toggleSearch() {
@@ -896,6 +1000,8 @@ export function App() {
             }}
             onSummarize={() => askAi("summarize")}
             onDraft={() => askAi("draft-reply")}
+            onAsk={(prompt) => askAi("question", prompt)}
+            onChat={(prompt) => askAi("chat", prompt)}
           />
         )}
         {activeTab === "settings" && (
@@ -990,20 +1096,87 @@ function AiTab({
   activeId,
   onSelect,
   onSummarize,
-  onDraft
+  onDraft,
+  onAsk,
+  onChat
 }: {
   conversations: Conversation[];
   activeId?: string;
   onSelect: (conversation: Conversation) => void;
   onSummarize: () => void;
   onDraft: () => void;
+  onAsk: (prompt: string) => Promise<string | undefined>;
+  onChat: (prompt: string) => Promise<string | undefined>;
 }) {
+  const [prompt, setPrompt] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [listening, setListening] = useState(false);
+  const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const [status, setStatus] = useState("");
+
+  function speak(text: string) {
+    if (!voiceEnabled || typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 0.96;
+    utterance.pitch = 1;
+    window.speechSynthesis.speak(utterance);
+  }
+
+  async function submit(mode: "question" | "chat", text = prompt) {
+    const trimmed = text.trim();
+    if (!trimmed || busy) return;
+    setBusy(true);
+    setStatus(mode === "question" ? "Thinking through your question..." : "Talking with AI...");
+    try {
+      const answer = mode === "question" ? await onAsk(trimmed) : await onChat(trimmed);
+      if (answer) speak(answer);
+      setPrompt("");
+      setStatus(answer ? "AI answered in the active chat." : "Open an AI chat first.");
+    } catch {
+      setStatus("Could not reach the AI assistant right now.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function startVoice() {
+    const SpeechRecognition = (window as unknown as {
+      SpeechRecognition?: new () => any;
+      webkitSpeechRecognition?: new () => any;
+    }).SpeechRecognition || (window as unknown as {
+      webkitSpeechRecognition?: new () => any;
+    }).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setStatus("Voice input is not supported in this browser.");
+      return;
+    }
+    const recognition = new SpeechRecognition();
+    recognition.lang = "en-US";
+    recognition.interimResults = false;
+    recognition.onstart = () => {
+      setListening(true);
+      setStatus("Listening...");
+    };
+    recognition.onerror = () => {
+      setListening(false);
+      setStatus("Voice input failed. Check microphone permission.");
+    };
+    recognition.onend = () => setListening(false);
+    recognition.onresult = (event: any) => {
+      const text = event.results[0]?.[0]?.transcript || "";
+      setPrompt(text);
+      void submit("chat", text);
+    };
+    recognition.start();
+  }
+
   return (
     <section className="tab-page ai-tab" aria-label="AI">
       <div className="glass-hero">
         <span><Sparkles size={25} /></span>
         <h2>AI assistant</h2>
-        <p>Summaries, cleaner replies, and private assistant chats stay close to your conversations.</p>
+        <p>Summaries, questions, private conversation, and voice assistance stay close to your chats.</p>
       </div>
       <div className="quick-actions">
         <button type="button" onClick={onSummarize}>
@@ -1021,6 +1194,54 @@ function AiTab({
           </span>
         </button>
       </div>
+      <form
+        className="ai-assistant-panel"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void submit("question");
+        }}
+      >
+        <label>
+          Ask AI
+          <textarea
+            value={prompt}
+            onChange={(event) => setPrompt(event.target.value)}
+            placeholder="Ask a question, or talk with the assistant..."
+            rows={3}
+          />
+        </label>
+        <div className="ai-assistant-actions">
+          <button type="submit" disabled={busy || !prompt.trim()}>
+            <Send size={17} />
+            <span>Ask</span>
+          </button>
+          <button type="button" disabled={busy || !prompt.trim()} onClick={() => void submit("chat")}>
+            <Bot size={17} />
+            <span>Chat</span>
+          </button>
+          <button
+            className={listening ? "active" : ""}
+            type="button"
+            disabled={busy}
+            onClick={startVoice}
+          >
+            {listening ? <Square size={17} /> : <Mic size={17} />}
+            <span>{listening ? "Stop" : "Voice"}</span>
+          </button>
+          <button
+            className={voiceEnabled ? "active" : ""}
+            type="button"
+            onClick={() => {
+              if (voiceEnabled && "speechSynthesis" in window) window.speechSynthesis.cancel();
+              setVoiceEnabled((current) => !current);
+            }}
+          >
+            <Volume2 size={17} />
+            <span>Speak</span>
+          </button>
+        </div>
+        {status && <p className="ai-assistant-status" role="status">{status}</p>}
+      </form>
       <div className="glass-list">
         <div className="section-label"><span>AI chats</span><small>{conversations.length}</small></div>
         {conversations.map((conversation) => (

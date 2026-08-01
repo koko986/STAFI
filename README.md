@@ -95,13 +95,46 @@ The schema creates a profile for each OAuth/phone user and enables row-level sec
 `supabase/storage.md` before deploying.
 
 Rerun the schema after pulling database changes. It safely creates the chat, contact, story,
-message reaction, story reaction, and reply structures without dropping existing profile or
-conversation data. The latest message-action migration is
-`supabase/migrations/20260730203000_message_actions_and_receipts.sql`.
+message reaction, story reaction, reply, and delete-for-me structures without dropping existing
+profile or conversation data. The latest message deletion migration is
+`supabase/migrations/20260801222500_message_delete_for_me.sql`.
+
+## Configure AI
+
+The Java backend supports OpenAI-compatible chat completions out of the box. Set an API key before
+starting the backend:
+
+```powershell
+$env:OPENAI_API_KEY="your-api-key"
+```
+
+For DeepSeek:
+
+```powershell
+$env:DEEPSEEK_API_KEY="your-api-key"
+$env:DEEPSEEK_API_URL="https://api.deepseek.com/chat/completions"
+$env:DEEPSEEK_MODEL="deepseek-v4-flash"
+```
+
+Optional overrides:
+
+```powershell
+$env:AI_API_URL="https://api.openai.com/v1/chat/completions"
+$env:AI_MODEL="gpt-4o-mini"
+```
+
+For a local model, run an Ollama-compatible server and optionally set:
+
+```powershell
+$env:AI_LOCAL_API_URL="http://localhost:11434/api/chat"
+$env:AI_LOCAL_MODEL="llama3.2"
+```
+
+If no hosted key or local model is available, Java Chat now uses a simple offline assistant fallback
+instead of showing a configuration error.
 
 ## Production Notes
 
 - Keep `SUPABASE_SECRET_KEY` on the Java server. Never expose it through a `VITE_` value.
-- Set `AI_API_URL`, `AI_MODEL`, and `AI_API_KEY` to use an OpenAI-compatible chat-completions
-  provider. Without them, the assistant remains in offline demo mode.
+- Set `DEEPSEEK_API_KEY`, `OPENAI_API_KEY`, or `AI_API_KEY` on the Java server for real hosted AI responses.
 - Pass only messages the authenticated user is authorized to read into AI requests.

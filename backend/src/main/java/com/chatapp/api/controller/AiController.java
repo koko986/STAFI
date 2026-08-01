@@ -43,4 +43,12 @@ public class AiController {
                 userContext.requireUserId(jwt)
         );
     }
+
+    @PostMapping("/question")
+    public AiResponse question(@Valid @RequestBody AiRequest request, @AuthenticationPrincipal Jwt jwt) {
+        return aiService.respond(
+                new AiRequest(request.conversationId(), "question", request.prompt()),
+                userContext.requireUserId(jwt)
+        );
+    }
 }
