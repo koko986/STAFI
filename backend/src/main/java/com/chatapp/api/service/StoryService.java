@@ -9,6 +9,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -20,6 +21,7 @@ import java.util.UUID;
 
 @Service
 public class StoryService {
+    private static final int STORY_COOLDOWN_HOURS = 24;
     private final SupabaseDatabase database;
     private final StorageService storageService;
     private final ProfileService profileService;
@@ -80,6 +82,21 @@ public class StoryService {
         String visibility = request.visibility() == null ? "contacts" : request.visibility().trim().toLowerCase();
         if (!List.of("contacts", "public").contains(visibility)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Story visibility must be contacts or public.");
+        }
+        JsonNode existing = database.first(database.query(
+                "stories",
+                Map.of(
+                        "owner_id", "eq." + ownerId,
+                        "created_at", "gte." + Instant.now().minus(STORY_COOLDOWN_HOURS, ChronoUnit.HOURS),
+                        "select", "id",
+                        "limit", "1"
+                )
+        ));
+        if (existing != null) {
+            throw new ResponseStatusException(
+                    HttpStatus.TOO_MANY_REQUESTS,
+                    "You can post only one story per day."
+            );
         }
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("owner_id", ownerId);
@@ -192,13 +209,17 @@ public class StoryService {
                 )
         );
         var conversation = chatService.startDirectConversation(senderId, ownerId);
+        String caption = textOrNull(row, "caption");
+        String storyContext = caption == null || caption.isBlank()
+                ? "Replied to your story"
+                : "Replied to your story: " + caption;
         chatService.addMessage(
                 new Message(
                         UUID.randomUUID(),
                         conversation.id(),
                         senderId,
                         "text",
-                        "Replied to your story: " + message,
+                        storyContext + "\n" + message,
                         null,
                         Instant.now()
                 ),

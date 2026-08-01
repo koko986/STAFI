@@ -65,6 +65,11 @@ public class MessageController {
         return message;
     }
 
+    @DeleteMapping("/messages/{messageId}/me")
+    public Message deleteForMe(@PathVariable("messageId") UUID messageId, @AuthenticationPrincipal Jwt jwt) {
+        return chatService.hideMessageForUser(messageId, userContext.requireUserId(jwt));
+    }
+
     @PostMapping("/messages/{messageId}/forward")
     public Message forward(
             @PathVariable("messageId") UUID messageId,

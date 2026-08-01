@@ -70,6 +70,13 @@ create table if not exists public.message_reactions (
   primary key (message_id, user_id)
 );
 
+create table if not exists public.message_deletions (
+  message_id uuid not null references public.messages(id) on delete cascade,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  deleted_at timestamptz not null default now(),
+  primary key (message_id, user_id)
+);
+
 do $$
 begin
   if not exists (

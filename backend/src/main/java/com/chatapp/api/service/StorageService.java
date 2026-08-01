@@ -17,6 +17,7 @@ import java.util.UUID;
 
 @Service
 public class StorageService {
+    private static final long STORY_VIDEO_MAX_BYTES = 12L * 1024 * 1024;
     private static final Map<String, BucketRules> BUCKETS = Map.of(
             "avatars", new BucketRules(
                     5L * 1024 * 1024,
@@ -77,6 +78,12 @@ public class StorageService {
         }
         if (file.getSize() > rules.maxBytes()) {
             throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, "The selected file is too large.");
+        }
+        if ("stories".equals(bucket) && contentType.startsWith("video/") && file.getSize() > STORY_VIDEO_MAX_BYTES) {
+            throw new ResponseStatusException(
+                    HttpStatus.PAYLOAD_TOO_LARGE,
+                    "Story videos must be 12 MB or smaller."
+            );
         }
 
         String path = userId + "/" + UUID.randomUUID() + "." + EXTENSIONS.get(contentType);

@@ -518,8 +518,13 @@ export function App() {
     return refreshed.mediaPath;
   }
 
-  async function deleteMessage(message: Message) {
+  async function deleteMessage(message: Message, mode: "me" | "all") {
     if (demoMode) {
+      setMessages((current) => current.filter((item) => item.id !== message.id));
+      return;
+    }
+    if (mode === "me") {
+      await apiDeleteJson<Message>(`/api/messages/${message.id}/me`);
       setMessages((current) => current.filter((item) => item.id !== message.id));
       return;
     }

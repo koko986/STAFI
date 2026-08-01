@@ -13,8 +13,10 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 @Service
 public class ChatService {
@@ -93,6 +95,10 @@ public class ChatService {
         );
         List<Message> messages = new ArrayList<>();
         if (rows != null && rows.isArray()) rows.forEach(row -> messages.add(toMessage(row)));
+        Set<UUID> hiddenMessageIds = hiddenMessageIds(userId);
+        messages = messages.stream()
+                .filter(message -> !hiddenMessageIds.contains(message.id()))
+                .toList();
         if (messages.isEmpty()) return List.of();
         if (!messages.isEmpty()) {
             database.update(
@@ -151,6 +157,28 @@ public class ChatService {
                 Map.of("deleted_at", Instant.now().toString())
         ));
         return toMessage(updated);
+    }
+
+    public Message hideMessageForUser(UUID messageId, UUID userId) {
+        JsonNode row = findMessageRow(messageId);
+        if (row == null || !row.path("deleted_at").isNull()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Message not found.");
+        }
+        UUID conversationId = UUID.fromString(row.path("conversation_id").asText());
+        requireMembership(conversationId, userId);
+        JsonNode existing = database.first(database.query(
+                "message_deletions",
+                Map.of(
+                        "message_id", "eq." + messageId,
+                        "user_id", "eq." + userId,
+                        "select", "message_id",
+                        "limit", "1"
+                )
+        ));
+        if (existing == null) {
+            database.insert("message_deletions", Map.of("message_id", messageId, "user_id", userId));
+        }
+        return toMessage(row);
     }
 
     public Message forwardMessage(UUID messageId, UUID targetConversationId, UUID userId) {
@@ -499,6 +527,18 @@ public class ChatService {
             }
         }
         return new ReactionSummary(counts, ownReaction);
+    }
+
+    private Set<UUID> hiddenMessageIds(UUID viewerId) {
+        JsonNode rows = database.query(
+                "message_deletions",
+                Map.of("user_id", "eq." + viewerId, "select", "message_id")
+        );
+        if (rows == null || !rows.isArray()) return Set.of();
+        return StreamSupport.stream(rows.spliterator(), false)
+                .map(row -> uuidOrNull(row, "message_id"))
+                .filter(id -> id != null)
+                .collect(Collectors.toSet());
     }
 
     private String normalizeReaction(String emoji) {

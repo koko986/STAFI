@@ -46,7 +46,7 @@ type Props = {
   onAskAi: (action: "summarize" | "draft-reply") => void;
   onBack: () => void;
   onOpenInfo: () => void;
-  onDelete: (message: Message) => Promise<void>;
+  onDelete: (message: Message, mode: "me" | "all") => Promise<void>;
   onForward: (message: Message, conversationId: string) => Promise<void>;
   onReact: (message: Message, reaction: MessageReaction) => Promise<void>;
   onRemoveReaction: (message: Message) => Promise<void>;
@@ -77,6 +77,7 @@ export function ChatWindow({
   const [selectedMessageId, setSelectedMessageId] = useState<string>();
   const [replyingTo, setReplyingTo] = useState<Message>();
   const [forwardingMessageId, setForwardingMessageId] = useState<string>();
+  const [deleteCandidate, setDeleteCandidate] = useState<Message>();
   const recorderRef = useRef<MediaRecorder>();
   const chunksRef = useRef<Blob[]>([]);
   const messageRefs = useRef<Record<string, HTMLElement | null>>({});
@@ -95,6 +96,7 @@ export function ChatWindow({
     setSelectedMessageId(undefined);
     setReplyingTo(undefined);
     setForwardingMessageId(undefined);
+    setDeleteCandidate(undefined);
     setVoiceError(undefined);
   }, [conversation?.id]);
 
@@ -346,13 +348,13 @@ export function ChatWindow({
                       <Forward size={16} />
                       <span>Forward</span>
                     </button>
-                    {mine && message.senderId && (
+                    {message.senderId && (
                       <button
                         className="danger"
                         type="button"
                         title="Delete"
-                        onClick={async () => {
-                          await onDelete(message);
+                        onClick={() => {
+                          setDeleteCandidate(message);
                           setSelectedMessageId(undefined);
                         }}
                       >
@@ -395,6 +397,46 @@ export function ChatWindow({
               ))}
             </div>
           ) : <small>No other chats yet</small>}
+        </div>
+      )}
+      {deleteCandidate && (
+        <div className="delete-choice-backdrop" role="presentation" onClick={() => setDeleteCandidate(undefined)}>
+          <section
+            className="delete-choice-sheet"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-choice-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header>
+              <strong id="delete-choice-title">Delete message?</strong>
+              <button type="button" title="Close delete menu" onClick={() => setDeleteCandidate(undefined)}>
+                <X size={17} />
+              </button>
+            </header>
+            <p>Choose how this message should be removed.</p>
+            <button
+              type="button"
+              onClick={async () => {
+                await onDelete(deleteCandidate, "me");
+                setDeleteCandidate(undefined);
+              }}
+            >
+              Delete only for me
+            </button>
+            {(deleteCandidate.senderId === "me" || deleteCandidate.senderId === currentUserId) && (
+              <button
+                className="danger"
+                type="button"
+                onClick={async () => {
+                  await onDelete(deleteCandidate, "all");
+                  setDeleteCandidate(undefined);
+                }}
+              >
+                Delete for everyone
+              </button>
+            )}
+          </section>
         </div>
       )}
       <div className="composer-shell">

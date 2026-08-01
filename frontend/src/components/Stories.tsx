@@ -33,6 +33,7 @@ const reactionOptions: Array<{ value: StoryReaction; label: string }> = [
   { value: "laugh", label: "😂" },
   { value: "clap", label: "👏" }
 ];
+const STORY_VIDEO_MAX_BYTES = 12 * 1024 * 1024;
 
 function timeLeft(expiresAt: string) {
   const milliseconds = Math.max(0, new Date(expiresAt).getTime() - Date.now());
@@ -72,6 +73,10 @@ export function Stories({
     }),
     [currentUserId, stories]
   );
+  const ownActiveStory = useMemo(
+    () => stories.find((story) => story.ownerId === currentUserId),
+    [currentUserId, stories]
+  );
   const previewUrl = useMemo(
     () => pendingFile ? URL.createObjectURL(pendingFile) : "",
     [pendingFile]
@@ -99,6 +104,10 @@ export function Stories({
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
+    if (file.type.startsWith("video/") && file.size > STORY_VIDEO_MAX_BYTES) {
+      setStatus("Story videos must be 12 MB or smaller.");
+      return;
+    }
     setPendingFile(file);
     setCaption("");
     setVisibility("contacts");
@@ -181,9 +190,20 @@ export function Stories({
   return (
     <>
       <div className="stories" aria-label="Stories">
-        <button className="story add-story" onClick={() => inputRef.current?.click()}>
+        <button
+          className={ownActiveStory ? "story add-story disabled" : "story add-story"}
+          type="button"
+          title={ownActiveStory ? "You can post only one story per day" : "Add story"}
+          onClick={() => {
+            if (ownActiveStory) {
+              setStatus("You can post only one story per day.");
+              return;
+            }
+            inputRef.current?.click();
+          }}
+        >
           <span><Plus size={18} /></span>
-          <small>Add story</small>
+          <small>{ownActiveStory ? "Posted" : "Add story"}</small>
         </button>
         {orderedStories.map((story) => (
           <button
@@ -199,6 +219,9 @@ export function Stories({
         ))}
         <input ref={inputRef} type="file" accept="image/*,video/*" hidden onChange={chooseStory} />
       </div>
+      {status && !pendingFile && !active && (
+        <p className="story-strip-status" role="status">{status}</p>
+      )}
 
       {pendingFile && (
         <div className="modal-backdrop story-composer-backdrop" role="presentation">
@@ -217,6 +240,9 @@ export function Stories({
                 ? <video src={previewUrl} controls />
                 : <img src={previewUrl} alt="Story preview" />}
             </div>
+            {pendingFile.type.startsWith("video/") && (
+              <p className="story-upload-hint">Video story limit: 12 MB.</p>
+            )}
             <label>
               Caption
               <input
@@ -341,6 +367,15 @@ export function Stories({
                   sendReply();
                 }}
               >
+                <div className="story-reply-context" aria-label="Replying to story">
+                  <span className="story-reply-thumb" style={{ backgroundImage: `url("${active.mediaPath}")` }}>
+                    {active.mediaPath.match(/\.(mp4|webm)(\?|$)/i) && <span>Video</span>}
+                  </span>
+                  <span>
+                    <strong>Replying to story</strong>
+                    <small>{active.caption || `${active.ownerName}'s story`}</small>
+                  </span>
+                </div>
                 <input
                   value={reply}
                   onChange={(event) => setReply(event.target.value)}
