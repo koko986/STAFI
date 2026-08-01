@@ -3024,6 +3024,8 @@ h1 {
 
 .conversation {
   grid-template-columns: 62px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 2px;
   padding: 8px 8px;
 }
 
@@ -3032,6 +3034,16 @@ h1 {
 .person-result:hover,
 .contact-row:hover {
   background: rgba(255, 255, 255, 0.18);
+}
+
+.conversation.unread {
+  background: rgba(24, 168, 242, 0.14);
+  box-shadow: inset 3px 0 0 rgba(24, 168, 242, 0.78);
+}
+
+.conversation.unread:hover,
+.conversation.unread.active {
+  background: rgba(24, 168, 242, 0.2);
 }
 
 .conversation .avatar,
@@ -3051,9 +3063,9 @@ h1 {
   letter-spacing: 0;
 }
 
-.conversation.unread > span:nth-child(2) strong {
+.conversation.unread .conversation-copy > strong {
   color: var(--app-ink);
-  font-weight: 900;
+  font-weight: 950;
 }
 
 .conversation small {
@@ -3062,8 +3074,21 @@ h1 {
   font-size: 15px;
 }
 
-.conversation > span:last-child {
+.conversation-copy {
   min-width: 0;
+}
+
+.message-preview {
+  max-width: 100%;
+  color: rgba(91, 105, 127, 0.95);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.unread-preview {
+  color: var(--app-ink) !important;
+  font-weight: 950;
 }
 
 .presence-line {
@@ -3089,6 +3114,14 @@ h1 {
   background: #94a3b8;
 }
 
+.unread-indicator {
+  min-width: 34px;
+  display: grid;
+  justify-items: end;
+  align-self: stretch;
+  align-items: center;
+}
+
 .unread-badge {
   min-width: 25px;
   height: 25px;
@@ -3099,7 +3132,7 @@ h1 {
   border-radius: 999px;
   color: #ffffff !important;
   font-size: 12px !important;
-  font-weight: 900;
+  font-weight: 950;
   line-height: 1;
   background: linear-gradient(135deg, #18a8f2, #0f8fd8);
   box-shadow: 0 10px 24px rgba(14, 165, 233, 0.3);

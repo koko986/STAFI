@@ -29,6 +29,7 @@ type Props = {
   searchOpen: boolean;
   unreadCounts: Record<string, number>;
   onlineUserIds: Set<string>;
+  conversationPreviews: Record<string, string>;
   onSelect: (conversation: Conversation) => void;
   onStartDirect: (profile: Profile) => Promise<void>;
   onViewProfile: (profile: Profile) => void;
@@ -42,6 +43,7 @@ export function ChatDiscovery({
   searchOpen,
   unreadCounts,
   onlineUserIds,
+  conversationPreviews,
   onSelect,
   onStartDirect,
   onViewProfile,
@@ -347,6 +349,7 @@ export function ChatDiscovery({
                   activeId={activeId}
                   unreadCounts={unreadCounts}
                   onlineUserIds={onlineUserIds}
+                  conversationPreviews={conversationPreviews}
                   onSelect={onSelect}
                 />
                 {!visibleConversations.length && <p className="empty-note">No matching chats.</p>}
@@ -510,6 +513,7 @@ export function ChatDiscovery({
             activeId={activeId}
             unreadCounts={unreadCounts}
             onlineUserIds={onlineUserIds}
+            conversationPreviews={conversationPreviews}
             onSelect={onSelect}
           />
           {!visibleConversations.length && <p className="empty-note">No matching chats.</p>}

@@ -126,6 +126,22 @@ export function App() {
     () => active ? messages.filter((message) => message.conversationId === active.id && !message.deletedAt) : [],
     [active, messages]
   );
+  const conversationPreviews = useMemo(() => {
+    const previews: Record<string, string> = {};
+    messages
+      .filter((message) => !message.deletedAt)
+      .sort((left, right) =>
+        new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime()
+      )
+      .forEach((message) => {
+        previews[message.conversationId] = message.type === "voice"
+          ? "Voice message"
+          : message.type === "ai"
+            ? `AI: ${message.body || "New response"}`
+            : message.body || "New message";
+      });
+    return previews;
+  }, [messages]);
   const onlineUserIds = useMemo(() => {
     const online = new Set<string>();
     Object.entries(presenceSeenAt).forEach(([userId, seenAt]) => {
@@ -849,6 +865,7 @@ export function App() {
               searchOpen={searchOpen}
               unreadCounts={unreadCounts}
               onlineUserIds={onlineUserIds}
+              conversationPreviews={conversationPreviews}
               onSelect={(conversation) => {
                 openConversation(conversation);
                 setFriendProfile(undefined);
