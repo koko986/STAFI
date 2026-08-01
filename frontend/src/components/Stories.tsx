@@ -22,6 +22,8 @@ type Props = {
   onRemoveReaction: (story: Story) => Promise<Story>;
   onReply: (story: Story, body: string) => Promise<Story>;
   onViewProfile: (profileId: string) => void;
+  openOwnerId?: string;
+  onOwnerStoryOpened?: () => void;
 };
 
 const reactionOptions: Array<{ value: StoryReaction; label: string }> = [
@@ -48,7 +50,9 @@ export function Stories({
   onReact,
   onRemoveReaction,
   onReply,
-  onViewProfile
+  onViewProfile,
+  openOwnerId,
+  onOwnerStoryOpened
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [active, setActive] = useState<Story>();
@@ -83,6 +87,13 @@ export function Stories({
     if (!latest) setActive(undefined);
     else if (latest !== active) setActive(latest);
   }, [active?.id, stories]);
+
+  useEffect(() => {
+    if (!openOwnerId) return;
+    const story = orderedStories.find((item) => item.ownerId === openOwnerId);
+    if (story) openStory(story);
+    onOwnerStoryOpened?.();
+  }, [openOwnerId, orderedStories, onOwnerStoryOpened]);
 
   function chooseStory(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -190,7 +201,7 @@ export function Stories({
       </div>
 
       {pendingFile && (
-        <div className="modal-backdrop" role="presentation">
+        <div className="modal-backdrop story-composer-backdrop" role="presentation">
           <section className="story-composer" role="dialog" aria-modal="true" aria-labelledby="story-composer-title">
             <header>
               <div>

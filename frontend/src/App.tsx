@@ -95,6 +95,7 @@ export function App() {
   const [activeTab, setActiveTab] = useState<AppTab>("chats");
   const [chatFilter, setChatFilter] = useState<ChatFilter>("all");
   const [searchOpen, setSearchOpen] = useState(false);
+  const [storyOwnerToOpen, setStoryOwnerToOpen] = useState<string>();
   const [accountContact, setAccountContact] = useState(
     isSupabaseConfigured ? "" : "Demo account"
   );
@@ -849,6 +850,8 @@ export function App() {
                 <Stories
                   stories={stories}
                   currentUserId={profile.id}
+                  openOwnerId={storyOwnerToOpen}
+                  onOwnerStoryOpened={() => setStoryOwnerToOpen(undefined)}
                   onCreate={createStory}
                   onDelete={deleteStory}
                   onViewed={viewStory}
@@ -962,9 +965,16 @@ export function App() {
       <UserInfoPanel
         profile={friendProfile}
         messages={active?.profile?.id === friendProfile?.id ? activeMessages : []}
+        stories={stories}
         onRefreshVoice={refreshVoiceMedia}
         onClose={() => setFriendProfile(undefined)}
         onMessage={startDirect}
+        onOpenStories={(profileId) => {
+          setStoryOwnerToOpen(profileId);
+          setFriendProfile(undefined);
+          setActiveTab("chats");
+          setSearchOpen(false);
+        }}
       />
     </main>
   );

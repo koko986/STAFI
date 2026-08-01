@@ -9,7 +9,7 @@ import {
   X
 } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
-import type { Message, Profile } from "../lib/api";
+import type { Message, Profile, Story } from "../lib/api";
 import { VoiceMessage } from "./VoiceMessage";
 
 type Props = {
@@ -18,11 +18,21 @@ type Props = {
   onClose: () => void;
   onMessage: (profile: Profile) => Promise<void>;
   onRefreshVoice: (messageId: string) => Promise<string>;
+  stories?: Story[];
+  onOpenStories?: (profileId: string) => void;
 };
 
 type SharedTab = "media" | "voice" | "links";
 
-export function UserInfoPanel({ profile, messages, onClose, onMessage, onRefreshVoice }: Props) {
+export function UserInfoPanel({
+  profile,
+  messages,
+  onClose,
+  onMessage,
+  onRefreshVoice,
+  stories = [],
+  onOpenStories
+}: Props) {
   const [tab, setTab] = useState<SharedTab>("media");
   const [notifications, setNotifications] = useState(true);
   const voiceMessages = useMemo(
@@ -32,6 +42,10 @@ export function UserInfoPanel({ profile, messages, onClose, onMessage, onRefresh
   const links = useMemo(
     () => messages.flatMap((message) => message.body?.match(/https?:\/\/[^\s]+/g) || []),
     [messages]
+  );
+  const profileStories = useMemo(
+    () => profile ? stories.filter((story) => story.ownerId === profile.id) : [],
+    [profile, stories]
   );
 
   useEffect(() => {
@@ -57,13 +71,21 @@ export function UserInfoPanel({ profile, messages, onClose, onMessage, onRefresh
 
       <div className="user-info-scroll">
         <div className="user-info-identity">
-          <span className="user-info-avatar">
+          <button
+            className={profileStories.length ? "user-info-avatar story-ready" : "user-info-avatar"}
+            type="button"
+            title={profileStories.length ? "View story" : "No active story"}
+            onClick={() => {
+              if (profileStories.length) onOpenStories?.(profile.id);
+            }}
+            disabled={!profileStories.length}
+          >
             {profile.avatarPath
               ? <img src={profile.avatarPath} alt="" />
               : <span>{profile.displayName.slice(0, 1).toUpperCase()}</span>}
-          </span>
+          </button>
           <h3>{profile.displayName}</h3>
-          <p>online</p>
+          <p>{profileStories.length ? `${profileStories.length} active story${profileStories.length > 1 ? "s" : ""}` : "online"}</p>
         </div>
 
         <div className="user-info-section">
