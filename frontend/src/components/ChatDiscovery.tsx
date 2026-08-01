@@ -26,6 +26,7 @@ import { ConversationList } from "./ConversationList";
 type Props = {
   conversations: Conversation[];
   activeId?: string;
+  searchOpen: boolean;
   onSelect: (conversation: Conversation) => void;
   onStartDirect: (profile: Profile) => Promise<void>;
   onViewProfile: (profile: Profile) => void;
@@ -36,6 +37,7 @@ type Props = {
 export function ChatDiscovery({
   conversations,
   activeId,
+  searchOpen,
   onSelect,
   onStartDirect,
   onViewProfile,
@@ -55,13 +57,22 @@ export function ChatDiscovery({
   const [connectionBusyId, setConnectionBusyId] = useState<string>();
   const [status, setStatus] = useState("");
 
-  const normalizedQuery = query.trim().replace(/^@+/, "");
+  const normalizedQuery = searchOpen ? query.trim().replace(/^@+/, "") : "";
 
   const visibleConversations = useMemo(() => {
     const needle = normalizedQuery.toLowerCase();
     if (!needle) return conversations;
     return conversations.filter((conversation) => conversation.title.toLowerCase().includes(needle));
   }, [conversations, normalizedQuery]);
+
+  useEffect(() => {
+    if (!searchOpen) {
+      setQuery("");
+      setPeople([]);
+      setSearching(false);
+      setStatus("");
+    }
+  }, [searchOpen]);
 
   useEffect(() => {
     const needle = normalizedQuery;
@@ -217,27 +228,129 @@ export function ChatDiscovery({
 
   return (
     <>
-      <div className="chat-search">
-        <Search size={17} aria-hidden="true" />
-        <input
-          value={query}
-          onChange={(event) => {
-            setQuery(event.target.value);
-            setStatus("");
-          }}
-          placeholder="Search name or @username"
-          aria-label="Search by name or username"
-        />
-        {query && (
-          <button type="button" title="Clear search" onClick={() => setQuery("")}>
-            <X size={16} />
+      {searchOpen && (
+        <div className="chat-search">
+          <Search size={17} aria-hidden="true" />
+          <input
+            value={query}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setStatus("");
+            }}
+            placeholder="Search name or @username"
+            aria-label="Search by name or username"
+            autoFocus
+          />
+          {query && (
+            <button type="button" title="Clear search" onClick={() => setQuery("")}>
+              <X size={16} />
+            </button>
+          )}
+          <button className="new-group-button" type="button" title="New group" onClick={openGroup}>
+            <Plus size={18} />
           </button>
-        )}
-        <button className="new-group-button" type="button" title="New group" onClick={openGroup}>
-          <Plus size={18} />
-        </button>
-      </div>
+        </div>
+      )}
 
+      {searchOpen && (
+        <div className="discovery-content search-only">
+          {normalizedQuery.length < 2 && (
+            <section className="search-empty-state" aria-label="Search">
+              <Search size={24} />
+              <strong>Search chats and people</strong>
+              <small>Type at least 2 characters to find usernames, names, and conversations.</small>
+            </section>
+          )}
+
+          {normalizedQuery.length >= 2 && (
+            <>
+              <section className="people-results" aria-label="People">
+                <div className="section-label">
+                  <span>People</span>
+                  {searching && <small>Searching...</small>}
+                </div>
+                {people.map((profile) => (
+                  <div
+                    className="person-result"
+                    key={profile.id}
+                  >
+                    <button
+                      className="person-main"
+                      type="button"
+                      onClick={() => onViewProfile(profile)}
+                      disabled={Boolean(openingProfileId)}
+                    >
+                      <span className="avatar">
+                        {profile.avatarPath ? <img src={profile.avatarPath} alt="" /> : <UserRound size={18} />}
+                      </span>
+                      <span>
+                        <strong>{profile.displayName}</strong>
+                        <small>@{profile.username}</small>
+                        {profile.bio && <small className="person-bio">{profile.bio}</small>}
+                      </span>
+                    </button>
+                    <button
+                      className="connection-action"
+                      type="button"
+                      title={
+                        connectionFor(profile.id)?.status === "accepted"
+                          ? "Contact"
+                          : connectionFor(profile.id)?.direction === "incoming"
+                            ? "Accept contact request"
+                            : connectionFor(profile.id)?.direction === "outgoing"
+                              ? "Request sent"
+                              : "Add contact"
+                      }
+                      disabled={
+                        connectionBusyId === profile.id
+                        || connectionFor(profile.id)?.direction === "outgoing"
+                      }
+                      onClick={() => {
+                        const connection = connectionFor(profile.id);
+                        if (connection?.direction === "incoming") acceptConnection(connection);
+                        else if (!connection) requestConnection(profile);
+                      }}
+                    >
+                      {connectionBusyId === profile.id
+                        ? <Clock3 size={17} />
+                        : connectionFor(profile.id)?.status === "accepted"
+                          ? <UserCheck size={17} />
+                          : connectionFor(profile.id)?.direction === "outgoing"
+                            ? <Clock3 size={17} />
+                            : <UserPlus size={17} />}
+                    </button>
+                    <button
+                      className="message-person"
+                      type="button"
+                      title="Message"
+                      onClick={() => startDirect(profile)}
+                      disabled={Boolean(openingProfileId)}
+                    >
+                      {openingProfileId === profile.id
+                        ? <Clock3 size={17} />
+                        : <MessageCircle size={17} />}
+                    </button>
+                  </div>
+                ))}
+                {!searching && people.length === 0 && <p className="empty-note">No people found.</p>}
+                {status && !groupOpen && <p className="discovery-status" role="status">{status}</p>}
+              </section>
+
+              <section className="chat-results" aria-label="Chats">
+                <div className="section-label"><span>Chats</span></div>
+                <ConversationList
+                  conversations={visibleConversations}
+                  activeId={activeId}
+                  onSelect={onSelect}
+                />
+                {!visibleConversations.length && <p className="empty-note">No matching chats.</p>}
+              </section>
+            </>
+          )}
+        </div>
+      )}
+
+      {!searchOpen && (
       <div className="discovery-content">
         {normalizedQuery.length >= 2 && (
           <section className="people-results" aria-label="People">
@@ -394,6 +507,7 @@ export function ChatDiscovery({
           {!visibleConversations.length && <p className="empty-note">No matching chats.</p>}
         </section>
       </div>
+      )}
 
       {groupOpen && (
         <div className="modal-backdrop" role="presentation">

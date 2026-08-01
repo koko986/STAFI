@@ -1,5 +1,20 @@
 import { Client } from "@stomp/stompjs";
-import { LogOut } from "lucide-react";
+import {
+  Bell,
+  Bot,
+  ChevronRight,
+  LogOut,
+  Menu,
+  MessageCircle,
+  Moon,
+  Palette,
+  Search,
+  Settings,
+  ShieldCheck,
+  Sparkles,
+  Sun,
+  UserRound
+} from "lucide-react";
 import SockJS from "sockjs-client";
 import { useEffect, useMemo, useState } from "react";
 import { ChatDiscovery } from "./components/ChatDiscovery";
@@ -49,6 +64,8 @@ const demoPeople: Profile[] = [
   { ...demoProfile, id: "dddddddd-dddd-dddd-dddd-dddddddddddd", displayName: "Su Myat", username: "sumyat", bio: "Design, music, and weekend stories." }
 ];
 const noPeople: Profile[] = [];
+type AppTab = "chats" | "ai" | "settings" | "profile";
+type ChatFilter = "all" | "direct" | "group" | "ai";
 
 function applyLocalReaction(message: Message, reaction?: MessageReaction): Message {
   const previous = message.ownReaction;
@@ -74,6 +91,9 @@ export function App() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [friendProfile, setFriendProfile] = useState<Profile>();
   const [mobileChatOpen, setMobileChatOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<AppTab>("chats");
+  const [chatFilter, setChatFilter] = useState<ChatFilter>("all");
+  const [searchOpen, setSearchOpen] = useState(false);
   const [accountContact, setAccountContact] = useState(
     isSupabaseConfigured ? "" : "Demo account"
   );
@@ -86,6 +106,18 @@ export function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [stories, setStories] = useState<Story[]>([]);
 
+  const aiConversations = useMemo(
+    () => conversations.filter((conversation) => conversation.type === "ai_private"),
+    [conversations]
+  );
+  const filteredConversations = useMemo(
+    () => conversations.filter((conversation) => {
+      if (chatFilter === "all") return true;
+      if (chatFilter === "ai") return conversation.type === "ai_private";
+      return conversation.type === chatFilter;
+    }),
+    [chatFilter, conversations]
+  );
   const activeMessages = useMemo(
     () => active ? messages.filter((message) => message.conversationId === active.id && !message.deletedAt) : [],
     [active, messages]
@@ -505,6 +537,21 @@ export function App() {
     localStorage.setItem("java-chat-theme", next);
   }
 
+  function openTab(tab: AppTab) {
+    setActiveTab(tab);
+    setMobileChatOpen(false);
+    setFriendProfile(undefined);
+    if (tab !== "chats") setSearchOpen(false);
+    if (tab === "profile") setProfileOpen(false);
+  }
+
+  function toggleSearch() {
+    setActiveTab("chats");
+    setMobileChatOpen(false);
+    setFriendProfile(undefined);
+    setSearchOpen((current) => activeTab === "chats" ? !current : true);
+  }
+
   async function signOut() {
     if (!demoMode) await supabase.auth.signOut();
     setDemoMode(false);
@@ -604,6 +651,14 @@ export function App() {
     );
   }
 
+  const tabLabel = activeTab === "chats"
+    ? searchOpen ? "Search" : "Java Chat"
+    : activeTab === "ai"
+      ? "AI"
+      : activeTab === "settings"
+        ? "Settings"
+        : "Profile";
+
   return (
     <main className={`${theme === "dark" ? "app dark" : "app"} ${profileOpen || friendProfile ? "info-open" : ""} ${mobileChatOpen ? "mobile-chat-open" : ""}`}>
       <aside className="sidebar">
@@ -612,10 +667,7 @@ export function App() {
             className="current-profile"
             type="button"
             title="Open my profile"
-            onClick={() => {
-              setFriendProfile(undefined);
-              setProfileOpen(true);
-            }}
+            onClick={() => openTab("profile")}
           >
             <span className="profile-mini-avatar">
               {profile?.avatarPath
@@ -623,39 +675,128 @@ export function App() {
                 : (profile?.displayName || "J").slice(0, 1).toUpperCase()}
             </span>
             <span>
-              <strong>{profile?.displayName || "Java Chat"}</strong>
+              <strong>{tabLabel}</strong>
               <small>{demoMode ? "Demo mode" : `@${profile?.username}`}</small>
             </span>
           </button>
-          <button className="sidebar-signout" type="button" title="Sign out" onClick={signOut}>
-            <LogOut size={17} />
-            <span>Sign out</span>
-          </button>
+          <span className="brand-actions">
+            <button
+              className={searchOpen && activeTab === "chats" ? "active" : ""}
+              type="button"
+              title={searchOpen && activeTab === "chats" ? "Close search" : "Search chats"}
+              onClick={toggleSearch}
+            >
+              <Search size={22} />
+            </button>
+            <button type="button" title="More options" onClick={() => openTab("settings")}>
+              <Menu size={22} />
+            </button>
+          </span>
         </div>
-        <Stories
-          stories={stories}
-          currentUserId={profile.id}
-          onCreate={createStory}
-          onDelete={deleteStory}
-          onViewed={viewStory}
-          onReact={reactToStory}
-          onRemoveReaction={removeStoryReaction}
-          onReply={replyToStory}
-          onViewProfile={(profileId) => openFriendProfile(profileId)}
-        />
-        <ChatDiscovery
-          conversations={conversations}
-          activeId={active?.id}
-          onSelect={(conversation) => {
-            setActive(conversation);
-            setFriendProfile(undefined);
-            setMobileChatOpen(true);
-          }}
-          onStartDirect={startDirect}
-          onViewProfile={(selectedProfile) => openFriendProfile(selectedProfile)}
-          onCreateGroup={createGroup}
-          fallbackPeople={demoMode ? demoPeople : noPeople}
-        />
+        {activeTab === "chats" && (
+          <>
+            {!searchOpen && (
+              <>
+                <div className="chat-filter-pills" aria-label="Chat filters">
+                  {([
+                    ["all", "All"],
+                    ["direct", "Chats"],
+                    ["group", "Groups"],
+                    ["ai", "AI"]
+                  ] as Array<[ChatFilter, string]>).map(([value, label]) => (
+                    <button
+                      className={chatFilter === value ? "active" : ""}
+                      type="button"
+                      key={value}
+                      onClick={() => setChatFilter(value)}
+                    >
+                      {label}
+                      {value === "ai" && aiConversations.length > 0 && <small>{aiConversations.length}</small>}
+                    </button>
+                  ))}
+                </div>
+                <Stories
+                  stories={stories}
+                  currentUserId={profile.id}
+                  onCreate={createStory}
+                  onDelete={deleteStory}
+                  onViewed={viewStory}
+                  onReact={reactToStory}
+                  onRemoveReaction={removeStoryReaction}
+                  onReply={replyToStory}
+                  onViewProfile={(profileId) => openFriendProfile(profileId)}
+                />
+              </>
+            )}
+            <ChatDiscovery
+              conversations={filteredConversations}
+              activeId={active?.id}
+              searchOpen={searchOpen}
+              onSelect={(conversation) => {
+                setActive(conversation);
+                setFriendProfile(undefined);
+                setMobileChatOpen(true);
+              }}
+              onStartDirect={startDirect}
+              onViewProfile={(selectedProfile) => openFriendProfile(selectedProfile)}
+              onCreateGroup={createGroup}
+              fallbackPeople={demoMode ? demoPeople : noPeople}
+            />
+          </>
+        )}
+        {activeTab === "ai" && (
+          <AiTab
+            conversations={aiConversations}
+            activeId={active?.id}
+            onSelect={(conversation) => {
+              setActive(conversation);
+              setMobileChatOpen(true);
+            }}
+            onSummarize={() => askAi("summarize")}
+            onDraft={() => askAi("draft-reply")}
+          />
+        )}
+        {activeTab === "settings" && (
+          <SettingsTab
+            theme={theme}
+            demoMode={demoMode}
+            accountContact={accountContact}
+            onToggleTheme={toggleTheme}
+            onOpenProfile={() => openTab("profile")}
+            onSignOut={signOut}
+          />
+        )}
+        {activeTab === "profile" && (
+          <ProfileTab
+            profile={profile}
+            accountContact={accountContact}
+            onEdit={() => {
+              setFriendProfile(undefined);
+              setProfileOpen(true);
+            }}
+            onSignOut={signOut}
+          />
+        )}
+        <nav className="app-tab-bar" aria-label="Primary">
+          <button className={activeTab === "chats" ? "active" : ""} type="button" onClick={() => openTab("chats")}>
+            <MessageCircle size={23} />
+            <span>Chat</span>
+          </button>
+          <button className={activeTab === "ai" ? "active" : ""} type="button" onClick={() => openTab("ai")}>
+            <Bot size={23} />
+            <span>AI</span>
+          </button>
+          <button className={activeTab === "settings" ? "active" : ""} type="button" onClick={() => openTab("settings")}>
+            <Settings size={23} />
+            <span>Setting</span>
+          </button>
+          <button className={activeTab === "profile" ? "active" : ""} type="button" onClick={() => openTab("profile")}>
+            {profile.avatarPath
+              ? <img src={profile.avatarPath} alt="" />
+              : <UserRound size={23} />}
+            <span>Profile</span>
+          </button>
+        </nav>
       </aside>
       <ChatWindow
         conversation={active}
@@ -692,5 +833,166 @@ export function App() {
         onMessage={startDirect}
       />
     </main>
+  );
+}
+
+function AiTab({
+  conversations,
+  activeId,
+  onSelect,
+  onSummarize,
+  onDraft
+}: {
+  conversations: Conversation[];
+  activeId?: string;
+  onSelect: (conversation: Conversation) => void;
+  onSummarize: () => void;
+  onDraft: () => void;
+}) {
+  return (
+    <section className="tab-page ai-tab" aria-label="AI">
+      <div className="glass-hero">
+        <span><Sparkles size={25} /></span>
+        <h2>AI assistant</h2>
+        <p>Summaries, cleaner replies, and private assistant chats stay close to your conversations.</p>
+      </div>
+      <div className="quick-actions">
+        <button type="button" onClick={onSummarize}>
+          <Bot size={18} />
+          <span>
+            <strong>Summarize active chat</strong>
+            <small>Catch up fast</small>
+          </span>
+        </button>
+        <button type="button" onClick={onDraft}>
+          <Sparkles size={18} />
+          <span>
+            <strong>Draft reply</strong>
+            <small>Get a polished suggestion</small>
+          </span>
+        </button>
+      </div>
+      <div className="glass-list">
+        <div className="section-label"><span>AI chats</span><small>{conversations.length}</small></div>
+        {conversations.map((conversation) => (
+          <button
+            className={conversation.id === activeId ? "glass-row active" : "glass-row"}
+            type="button"
+            key={conversation.id}
+            onClick={() => onSelect(conversation)}
+          >
+            <span className="avatar ai-avatar">AI</span>
+            <span>
+              <strong>{conversation.title}</strong>
+              <small>Private assistant</small>
+            </span>
+            <ChevronRight size={17} />
+          </button>
+        ))}
+        {!conversations.length && <p className="empty-note">No AI chats yet.</p>}
+      </div>
+    </section>
+  );
+}
+
+function SettingsTab({
+  theme,
+  demoMode,
+  accountContact,
+  onToggleTheme,
+  onOpenProfile,
+  onSignOut
+}: {
+  theme: "light" | "dark";
+  demoMode: boolean;
+  accountContact: string;
+  onToggleTheme: () => void;
+  onOpenProfile: () => void;
+  onSignOut: () => void;
+}) {
+  return (
+    <section className="tab-page settings-tab" aria-label="Settings">
+      <div className="glass-list">
+        <button className="glass-row" type="button" onClick={onToggleTheme}>
+          <span className="setting-icon">{theme === "dark" ? <Moon size={19} /> : <Sun size={19} />}</span>
+          <span>
+            <strong>Appearance</strong>
+            <small>{theme === "dark" ? "Dark glass" : "Light glass"}</small>
+          </span>
+          <ChevronRight size={17} />
+        </button>
+        <button className="glass-row" type="button" onClick={onOpenProfile}>
+          <span className="setting-icon"><Palette size={19} /></span>
+          <span>
+            <strong>Profile style</strong>
+            <small>Edit name, username, bio, and avatar</small>
+          </span>
+          <ChevronRight size={17} />
+        </button>
+        <div className="glass-row passive">
+          <span className="setting-icon"><ShieldCheck size={19} /></span>
+          <span>
+            <strong>Account</strong>
+            <small>{demoMode ? "Demo mode" : accountContact || "Signed in"}</small>
+          </span>
+        </div>
+        <div className="glass-row passive">
+          <span className="setting-icon"><Bell size={19} /></span>
+          <span>
+            <strong>Notifications</strong>
+            <small>Ready for contact and story updates</small>
+          </span>
+        </div>
+      </div>
+      <button className="danger-glass-button" type="button" onClick={onSignOut}>
+        <LogOut size={18} />
+        Sign out
+      </button>
+    </section>
+  );
+}
+
+function ProfileTab({
+  profile,
+  accountContact,
+  onEdit,
+  onSignOut
+}: {
+  profile: Profile;
+  accountContact: string;
+  onEdit: () => void;
+  onSignOut: () => void;
+}) {
+  return (
+    <section className="tab-page profile-tab" aria-label="Profile">
+      <div className="profile-card-glass">
+        <span className="profile-details-avatar">
+          {profile.avatarPath
+            ? <img src={profile.avatarPath} alt="" />
+            : <span>{profile.displayName.slice(0, 1).toUpperCase()}</span>}
+        </span>
+        <h2>{profile.displayName}</h2>
+        <p>@{profile.username}</p>
+        {profile.bio && <small>{profile.bio}</small>}
+      </div>
+      <div className="glass-list">
+        <button className="glass-row" type="button" onClick={onEdit}>
+          <span className="setting-icon"><UserRound size={19} /></span>
+          <span>
+            <strong>Edit profile</strong>
+            <small>{accountContact || "Profile and identity"}</small>
+          </span>
+          <ChevronRight size={17} />
+        </button>
+        <button className="glass-row" type="button" onClick={onSignOut}>
+          <span className="setting-icon"><LogOut size={19} /></span>
+          <span>
+            <strong>Sign out</strong>
+            <small>Leave this device</small>
+          </span>
+          <ChevronRight size={17} />
+        </button>
+      </div>
+    </section>
   );
 }
