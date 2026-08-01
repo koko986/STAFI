@@ -64,6 +64,15 @@ export async function apiDelete(path: string): Promise<void> {
   if (!response.ok) throw new Error(await response.text());
 }
 
+export async function apiDeleteJson<T>(path: string): Promise<T> {
+  const response = await fetch(`${API_URL}${path}`, {
+    method: "DELETE",
+    headers: await authHeaders(false)
+  });
+  if (!response.ok) throw new Error(await response.text());
+  return response.json();
+}
+
 export async function apiUpload<T>(path: string, file: Blob, filename: string): Promise<T> {
   const formData = new FormData();
   formData.append("file", file, filename);
@@ -101,7 +110,23 @@ export type Message = {
   type: "text" | "voice" | "ai";
   body?: string;
   mediaPath?: string;
+  replyToMessageId?: string;
+  replyPreview?: string;
+  forwardedFromMessageId?: string;
+  forwarded?: boolean;
+  reactions?: Partial<Record<MessageReaction, number>>;
+  ownReaction?: MessageReaction;
+  status?: "sent" | "delivered" | "seen";
   createdAt: string;
+  deletedAt?: string;
+};
+
+export type MessageReaction = "heart" | "fire" | "like" | "laugh" | "clap";
+
+export type ReadReceipt = {
+  conversationId: string;
+  userId: string;
+  lastReadMessageId: string;
 };
 
 export type Story = {

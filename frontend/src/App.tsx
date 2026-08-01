@@ -1,4 +1,5 @@
 import { Client } from "@stomp/stompjs";
+import { LogOut } from "lucide-react";
 import SockJS from "sockjs-client";
 import { useEffect, useMemo, useState } from "react";
 import { ChatDiscovery } from "./components/ChatDiscovery";
@@ -10,13 +11,16 @@ import { Stories } from "./components/Stories";
 import { UserInfoPanel } from "./components/UserInfoPanel";
 import {
   apiDelete,
+  apiDeleteJson,
   apiGet,
   apiPost,
   apiPut,
   WS_URL,
   type Conversation,
   type Message,
+  type MessageReaction,
   type Profile,
+  type ReadReceipt,
   type Story,
   type StoryReaction
 } from "./lib/api";
@@ -46,6 +50,18 @@ const demoPeople: Profile[] = [
 ];
 const noPeople: Profile[] = [];
 
+function applyLocalReaction(message: Message, reaction?: MessageReaction): Message {
+  const previous = message.ownReaction;
+  const reactions = { ...(message.reactions || {}) };
+  if (previous) {
+    const previousCount = reactions[previous] || 0;
+    if (previousCount <= 1) delete reactions[previous];
+    else reactions[previous] = previousCount - 1;
+  }
+  if (reaction) reactions[reaction] = (reactions[reaction] || 0) + 1;
+  return { ...message, reactions, ownReaction: reaction };
+}
+
 export function App() {
   const [ready, setReady] = useState(!isSupabaseConfigured);
   const [loggedIn, setLoggedIn] = useState(!isSupabaseConfigured);
@@ -57,6 +73,7 @@ export function App() {
   const [profileReady, setProfileReady] = useState(!isSupabaseConfigured);
   const [profileOpen, setProfileOpen] = useState(false);
   const [friendProfile, setFriendProfile] = useState<Profile>();
+  const [mobileChatOpen, setMobileChatOpen] = useState(false);
   const [accountContact, setAccountContact] = useState(
     isSupabaseConfigured ? "" : "Demo account"
   );
@@ -70,9 +87,55 @@ export function App() {
   const [stories, setStories] = useState<Story[]>([]);
 
   const activeMessages = useMemo(
-    () => active ? messages.filter((message) => message.conversationId === active.id) : [],
+    () => active ? messages.filter((message) => message.conversationId === active.id && !message.deletedAt) : [],
     [active, messages]
   );
+
+  function upsertMessage(message: Message, preserveViewerState = false) {
+    setMessages((current) => {
+      if (message.deletedAt) {
+        return current.filter((item) => item.id !== message.id);
+      }
+      const existing = current.find((item) => item.id === message.id);
+      if (!existing) return [...current, message];
+      const stableMediaPath = message.type === "voice" && existing.mediaPath
+        ? existing.mediaPath
+        : message.mediaPath;
+      const next = preserveViewerState
+        ? {
+            ...message,
+            mediaPath: stableMediaPath,
+            ownReaction: existing.ownReaction,
+            status: message.status || existing.status
+          }
+        : { ...message, mediaPath: stableMediaPath };
+      return current.map((item) => item.id === message.id ? next : item);
+    });
+  }
+
+  function mergeConversationMessages(conversationId: string, incoming: Message[]) {
+    setMessages((current) => {
+      const currentById = new Map(current.map((message) => [message.id, message]));
+      const stableIncoming = incoming.map((message) => {
+        const existing = currentById.get(message.id);
+        return message.type === "voice" && existing?.mediaPath
+          ? { ...message, mediaPath: existing.mediaPath }
+          : message;
+      });
+      const incomingIds = new Set(stableIncoming.map((message) => message.id));
+      const recentLocalMessages = current.filter((message) => {
+        if (message.conversationId !== conversationId || incomingIds.has(message.id)) return false;
+        return Date.now() - new Date(message.createdAt).getTime() < 60_000;
+      });
+      return [
+        ...current.filter((message) => message.conversationId !== conversationId),
+        ...stableIncoming,
+        ...recentLocalMessages
+      ].sort((left, right) =>
+        new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime()
+      );
+    });
+  }
 
   useEffect(() => {
     if (!isSupabaseConfigured) return;
@@ -151,27 +214,56 @@ export function App() {
 
   useEffect(() => {
     if (!loggedIn || !active) return;
-    apiGet<Message[]>(`/api/conversations/${active.id}/messages`)
-      .then((items) => {
-        setMessages((current) => [
-          ...current.filter((message) => message.conversationId !== active.id),
-          ...items
-        ]);
-      })
-      .catch(() => undefined);
+    let mounted = true;
+    const loadMessages = () => {
+      apiGet<Message[]>(`/api/conversations/${active.id}/messages`)
+        .then((items) => {
+          if (mounted) mergeConversationMessages(active.id, items);
+        })
+        .catch(() => undefined);
+    };
+    loadMessages();
+    const refresh = window.setInterval(loadMessages, 2500);
+    return () => {
+      mounted = false;
+      window.clearInterval(refresh);
+    };
   }, [active, loggedIn]);
 
   useEffect(() => {
-    if (!loggedIn || !active) return;
+    if (!loggedIn || !conversations.length) return;
     const client = new Client({
       webSocketFactory: () => new SockJS(WS_URL),
-      reconnectDelay: 5000,
+      reconnectDelay: 1000,
+      connectionTimeout: 5000,
+      heartbeatIncoming: 10000,
+      heartbeatOutgoing: 10000,
       onConnect: () => {
-        client.subscribe(`/topic/conversations/${active.id}`, (frame) => {
-          const incoming = JSON.parse(frame.body) as Message;
-          setMessages((current) =>
-            current.some((message) => message.id === incoming.id) ? current : [...current, incoming]
-          );
+        conversations.forEach((conversation) => {
+          client.subscribe(`/topic/conversations/${conversation.id}`, (frame) => {
+            const incoming = JSON.parse(frame.body) as Message;
+            upsertMessage(incoming, true);
+          });
+          client.subscribe(`/topic/conversations/${conversation.id}/receipts`, (frame) => {
+            const receipt = JSON.parse(frame.body) as ReadReceipt;
+            if (receipt.userId === profile?.id || conversation.type !== "direct") return;
+            setMessages((current) => {
+              const conversationMessages = current.filter(
+                (message) => message.conversationId === receipt.conversationId
+              );
+              const readIndex = conversationMessages.findIndex(
+                (message) => message.id === receipt.lastReadMessageId
+              );
+              if (readIndex < 0) return current;
+              const readIds = new Set(conversationMessages.slice(0, readIndex + 1).map((message) => message.id));
+              return current.map((message) =>
+                readIds.has(message.id)
+                  && (message.senderId === "me" || message.senderId === profile?.id)
+                  ? { ...message, status: "seen" }
+                  : message
+              );
+            });
+          });
         });
       }
     });
@@ -179,10 +271,13 @@ export function App() {
     return () => {
       client.deactivate();
     };
-  }, [active, loggedIn]);
+  }, [conversations, loggedIn, profile?.id]);
 
-  async function send(body: string) {
+  async function send(body: string, replyToMessageId?: string) {
     if (!active) return;
+    const replyingTo = replyToMessageId
+      ? activeMessages.find((message) => message.id === replyToMessageId)
+      : undefined;
     const id = crypto.randomUUID();
     const optimistic: Message = {
       id,
@@ -190,15 +285,37 @@ export function App() {
       senderId: "me",
       type: "text",
       body,
+      replyToMessageId,
+      replyPreview: replyingTo?.type === "voice" ? "Voice message" : replyingTo?.body,
+      reactions: {},
+      status: "sent",
       createdAt: new Date().toISOString()
     };
     setMessages((current) => [...current, optimistic]);
-    await apiPost<Message>("/api/messages", { id, conversationId: active.id, type: "text", body }).catch(() => undefined);
+    const saved = await apiPost<Message>("/api/messages", {
+      id,
+      conversationId: active.id,
+      type: "text",
+      body,
+      replyToMessageId
+    }).catch(() => undefined);
+    if (saved) upsertMessage(saved);
   }
 
-  async function sendVoice(voice: Blob) {
+  async function sendVoice(voice: Blob, replyToMessageId?: string) {
     if (!active) return;
-    const uploaded = await uploadMedia("voice-messages", voice, "webm");
+    const mimeType = voice.type.split(";")[0].toLowerCase();
+    const extension = mimeType === "audio/mp4"
+      ? "m4a"
+      : mimeType === "audio/ogg"
+        ? "ogg"
+        : mimeType === "audio/mpeg"
+          ? "mp3"
+          : "webm";
+    const uploaded = await uploadMedia("voice-messages", voice, extension);
+    const replyingTo = replyToMessageId
+      ? activeMessages.find((message) => message.id === replyToMessageId)
+      : undefined;
     const id = crypto.randomUUID();
     const message: Message = {
       id,
@@ -206,15 +323,91 @@ export function App() {
       senderId: "me",
       type: "voice",
       mediaPath: uploaded.url,
+      replyToMessageId,
+      replyPreview: replyingTo?.type === "voice" ? "Voice message" : replyingTo?.body,
+      reactions: {},
+      status: "sent",
       createdAt: new Date().toISOString()
     };
     setMessages((current) => [...current, message]);
-    await apiPost<Message>("/api/messages", {
-      id,
-      conversationId: active.id,
-      type: "voice",
-      mediaPath: uploaded.path
-    }).catch(() => undefined);
+    try {
+      const saved = await apiPost<Message>("/api/messages", {
+        id,
+        conversationId: active.id,
+        type: "voice",
+        mediaPath: uploaded.path,
+        replyToMessageId
+      });
+      upsertMessage(saved);
+    } catch (error) {
+      setMessages((current) => current.filter((item) => item.id !== id));
+      throw error;
+    }
+  }
+
+  async function refreshVoiceMedia(messageId: string) {
+    if (!active) throw new Error("Open the conversation before playing voice messages.");
+    const items = await apiGet<Message[]>(`/api/conversations/${active.id}/messages`);
+    const refreshed = items.find((message) => message.id === messageId && message.type === "voice");
+    if (!refreshed?.mediaPath) throw new Error("Voice message was not found.");
+    setMessages((current) => current.map((message) =>
+      message.id === messageId ? { ...message, mediaPath: refreshed.mediaPath } : message
+    ));
+    return refreshed.mediaPath;
+  }
+
+  async function deleteMessage(message: Message) {
+    if (demoMode) {
+      setMessages((current) => current.filter((item) => item.id !== message.id));
+      return;
+    }
+    const deleted = await apiDeleteJson<Message>(`/api/messages/${message.id}`);
+    upsertMessage(deleted);
+  }
+
+  async function forwardMessage(message: Message, conversationId: string) {
+    if (demoMode) {
+      const forwarded: Message = {
+        ...message,
+        id: crypto.randomUUID(),
+        conversationId,
+        senderId: "me",
+        forwarded: true,
+        forwardedFromMessageId: message.id,
+        status: "sent",
+        createdAt: new Date().toISOString()
+      };
+      upsertMessage(forwarded);
+      return;
+    }
+    const forwarded = await apiPost<Message>(`/api/messages/${message.id}/forward`, { conversationId });
+    upsertMessage(forwarded);
+  }
+
+  async function reactToMessage(message: Message, reaction: MessageReaction) {
+    const optimistic = applyLocalReaction(message, reaction);
+    upsertMessage(optimistic);
+    if (demoMode) return;
+    try {
+      const updated = await apiPut<Message>(`/api/messages/${message.id}/reaction`, { emoji: reaction });
+      upsertMessage(updated);
+    } catch (error) {
+      upsertMessage(message);
+      throw error;
+    }
+  }
+
+  async function removeMessageReaction(message: Message) {
+    const optimistic = applyLocalReaction(message);
+    upsertMessage(optimistic);
+    if (demoMode) return;
+    try {
+      const updated = await apiDeleteJson<Message>(`/api/messages/${message.id}/reaction`);
+      upsertMessage(updated);
+    } catch (error) {
+      upsertMessage(message);
+      throw error;
+    }
   }
 
   async function createStory(file: File, caption: string, visibility: Story["visibility"]) {
@@ -353,6 +546,7 @@ export function App() {
       current.some((item) => item.id === conversation.id) ? current : [conversation, ...current]
     );
     setActive(conversation);
+    setMobileChatOpen(true);
   }
 
   async function createGroup(title: string, memberIds: string[]) {
@@ -361,6 +555,7 @@ export function App() {
       : await apiPost<Conversation>("/api/conversations/groups", { title, memberIds });
     setConversations((current) => [conversation, ...current]);
     setActive(conversation);
+    setMobileChatOpen(true);
   }
 
   if (!ready) {
@@ -410,7 +605,7 @@ export function App() {
   }
 
   return (
-    <main className={`${theme === "dark" ? "app dark" : "app"} ${profileOpen || friendProfile ? "info-open" : ""}`}>
+    <main className={`${theme === "dark" ? "app dark" : "app"} ${profileOpen || friendProfile ? "info-open" : ""} ${mobileChatOpen ? "mobile-chat-open" : ""}`}>
       <aside className="sidebar">
         <div className="brand">
           <button
@@ -432,7 +627,10 @@ export function App() {
               <small>{demoMode ? "Demo mode" : `@${profile?.username}`}</small>
             </span>
           </button>
-          <button onClick={signOut}>Sign out</button>
+          <button className="sidebar-signout" type="button" title="Sign out" onClick={signOut}>
+            <LogOut size={17} />
+            <span>Sign out</span>
+          </button>
         </div>
         <Stories
           stories={stories}
@@ -451,6 +649,7 @@ export function App() {
           onSelect={(conversation) => {
             setActive(conversation);
             setFriendProfile(undefined);
+            setMobileChatOpen(true);
           }}
           onStartDirect={startDirect}
           onViewProfile={(selectedProfile) => openFriendProfile(selectedProfile)}
@@ -460,13 +659,20 @@ export function App() {
       </aside>
       <ChatWindow
         conversation={active}
+        conversations={conversations}
         messages={activeMessages}
         currentUserId={profile?.id}
         theme={theme}
         onToggleTheme={toggleTheme}
         onSend={send}
         onSendVoice={sendVoice}
+        onRefreshVoice={refreshVoiceMedia}
         onAskAi={askAi}
+        onDelete={deleteMessage}
+        onForward={forwardMessage}
+        onReact={reactToMessage}
+        onRemoveReaction={removeMessageReaction}
+        onBack={() => setMobileChatOpen(false)}
         onOpenInfo={() => {
           if (active?.profile) openFriendProfile(active.profile);
         }}
@@ -481,6 +687,7 @@ export function App() {
       <UserInfoPanel
         profile={friendProfile}
         messages={active?.profile?.id === friendProfile?.id ? activeMessages : []}
+        onRefreshVoice={refreshVoiceMedia}
         onClose={() => setFriendProfile(undefined)}
         onMessage={startDirect}
       />

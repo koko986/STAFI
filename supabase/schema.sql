@@ -51,6 +51,8 @@ create table if not exists public.messages (
   type text not null check (type in ('text', 'voice', 'ai')),
   body text,
   media_path text,
+  reply_to_message_id uuid references public.messages(id) on delete set null,
+  forwarded_from_message_id uuid references public.messages(id) on delete set null,
   created_at timestamptz not null default now(),
   edited_at timestamptz,
   deleted_at timestamptz,
@@ -58,6 +60,14 @@ create table if not exists public.messages (
     (type in ('text', 'ai') and nullif(btrim(body), '') is not null)
     or (type = 'voice' and nullif(btrim(media_path), '') is not null)
   )
+);
+
+create table if not exists public.message_reactions (
+  message_id uuid not null references public.messages(id) on delete cascade,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  emoji text not null check (emoji in ('heart', 'fire', 'like', 'laugh', 'clap')),
+  reacted_at timestamptz not null default now(),
+  primary key (message_id, user_id)
 );
 
 do $$
@@ -253,6 +263,7 @@ alter table public.profiles enable row level security;
 alter table public.conversations enable row level security;
 alter table public.conversation_members enable row level security;
 alter table public.messages enable row level security;
+alter table public.message_reactions enable row level security;
 alter table public.stories enable row level security;
 alter table public.connections enable row level security;
 alter table public.story_views enable row level security;
@@ -263,12 +274,13 @@ grant select, insert, update on public.profiles to authenticated;
 grant select, insert, update, delete on public.conversations to authenticated;
 grant select, insert, update, delete on public.conversation_members to authenticated;
 grant select, insert, update, delete on public.messages to authenticated;
+grant select, insert, update, delete on public.message_reactions to authenticated;
 grant select, insert, update, delete on public.stories to authenticated;
 grant select, insert, update, delete on public.connections to authenticated;
 grant select, insert, delete on public.story_views to authenticated;
 grant select, insert on public.ai_events to authenticated;
 grant all on public.profiles, public.conversations, public.conversation_members,
-  public.messages, public.stories, public.connections, public.story_views,
+  public.messages, public.message_reactions, public.stories, public.connections, public.story_views,
   public.ai_events to service_role;
 
 drop policy if exists "profiles are visible to authenticated users" on public.profiles;
@@ -371,6 +383,44 @@ create policy "senders can delete own messages"
 on public.messages for delete
 to authenticated
 using (sender_id = auth.uid());
+
+drop policy if exists "members can view message reactions" on public.message_reactions;
+create policy "members can view message reactions"
+on public.message_reactions for select
+to authenticated
+using (
+  exists (
+    select 1 from public.messages
+    where messages.id = message_reactions.message_id
+      and public.is_conversation_member(messages.conversation_id)
+  )
+);
+
+drop policy if exists "members can react to messages" on public.message_reactions;
+create policy "members can react to messages"
+on public.message_reactions for insert
+to authenticated
+with check (
+  user_id = auth.uid()
+  and exists (
+    select 1 from public.messages
+    where messages.id = message_reactions.message_id
+      and public.is_conversation_member(messages.conversation_id)
+  )
+);
+
+drop policy if exists "users can change own message reactions" on public.message_reactions;
+create policy "users can change own message reactions"
+on public.message_reactions for update
+to authenticated
+using (user_id = auth.uid())
+with check (user_id = auth.uid());
+
+drop policy if exists "users can remove own message reactions" on public.message_reactions;
+create policy "users can remove own message reactions"
+on public.message_reactions for delete
+to authenticated
+using (user_id = auth.uid());
 
 drop policy if exists "owners can manage stories" on public.stories;
 create policy "owners can manage stories"
@@ -480,6 +530,9 @@ create index if not exists conversation_members_user_joined_idx
 on public.conversation_members(user_id, joined_at desc);
 
 create index if not exists messages_conversation_created_idx on public.messages(conversation_id, created_at desc);
+create index if not exists messages_reply_idx on public.messages(reply_to_message_id);
+create index if not exists messages_forward_idx on public.messages(forwarded_from_message_id);
+create index if not exists message_reactions_reacted_idx on public.message_reactions(message_id, reacted_at desc);
 create index if not exists stories_owner_expires_idx on public.stories(owner_id, expires_at desc);
 create index if not exists stories_expires_idx on public.stories(expires_at);
 create index if not exists connections_requester_status_idx

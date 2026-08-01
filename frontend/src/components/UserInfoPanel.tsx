@@ -10,17 +10,19 @@ import {
 } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import type { Message, Profile } from "../lib/api";
+import { VoiceMessage } from "./VoiceMessage";
 
 type Props = {
   profile?: Profile;
   messages: Message[];
   onClose: () => void;
   onMessage: (profile: Profile) => Promise<void>;
+  onRefreshVoice: (messageId: string) => Promise<string>;
 };
 
 type SharedTab = "media" | "voice" | "links";
 
-export function UserInfoPanel({ profile, messages, onClose, onMessage }: Props) {
+export function UserInfoPanel({ profile, messages, onClose, onMessage, onRefreshVoice }: Props) {
   const [tab, setTab] = useState<SharedTab>("media");
   const [notifications, setNotifications] = useState(true);
   const voiceMessages = useMemo(
@@ -131,7 +133,7 @@ export function UserInfoPanel({ profile, messages, onClose, onMessage }: Props) 
               voiceMessages.length ? (
                 <div className="user-info-voice-list">
                   {voiceMessages.map((message) => (
-                    <audio controls src={message.mediaPath} key={message.id} />
+                    <VoiceMessage compact message={message} onRefresh={onRefreshVoice} key={message.id} />
                   ))}
                 </div>
               ) : <Empty icon={<Mic2 size={25} />} label="No voice messages" />

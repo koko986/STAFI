@@ -10,7 +10,7 @@ Auth/Postgres/Storage, stories, voice messages, themes, and an AI assistant.
 - Account search, contact requests, friend profiles, reusable direct chats, and groups
 - Local demo mode when Supabase keys are not configured
 - Direct, group, and private AI conversations
-- REST message history and STOMP WebSocket delivery
+- REST message history, replies, forwards, reactions, delivery/seen marks, and STOMP WebSocket delivery
 - Browser microphone recording and voice playback
 - Contact-only or public image/video stories that expire after 24 hours
 - Story view counts, reactions, private replies, and owner-controlled deletion
@@ -95,7 +95,9 @@ The schema creates a profile for each OAuth/phone user and enables row-level sec
 `supabase/storage.md` before deploying.
 
 Rerun the schema after pulling database changes. It safely creates the chat, contact, story,
-reaction, and reply structures without dropping existing profile or conversation data.
+message reaction, story reaction, and reply structures without dropping existing profile or
+conversation data. The latest message-action migration is
+`supabase/migrations/20260730203000_message_actions_and_receipts.sql`.
 
 ## Production Notes
 
