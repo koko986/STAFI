@@ -89,7 +89,7 @@ export function Login() {
     <main className="login-shell">
       <section className="login-panel">
         <div>
-          <p className="eyebrow">Java Chat</p>
+          <p className="eyebrow">STAFI</p>
           <h1>Messages, stories, voice, and AI in one place.</h1>
         </div>
         <div className="auth-mode" aria-label="Authentication mode">

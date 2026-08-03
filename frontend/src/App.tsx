@@ -58,7 +58,7 @@ const demoProfile: Profile = {
   id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
   displayName: "Demo User",
   username: "demo_user",
-  bio: "Exploring Java Chat.",
+  bio: "Exploring STAFI.",
   themeMode: "system",
   accentColor: "#2563eb",
   onboarded: true
@@ -334,9 +334,9 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    document.title = unreadTotal > 0 ? `(${unreadTotal}) Java Chat` : "Java Chat";
+    document.title = unreadTotal > 0 ? `(${unreadTotal}) STAFI` : "STAFI";
     return () => {
-      document.title = "Java Chat";
+      document.title = "STAFI";
     };
   }, [unreadTotal]);
 
@@ -969,8 +969,8 @@ export function App() {
   if (!ready) {
     return (
       <main className="loading-shell" aria-live="polite">
-        <div className="loading-mark" aria-hidden="true">J</div>
-        <strong>Java Chat</strong>
+        <div className="loading-mark" aria-hidden="true">S</div>
+        <strong>STAFI</strong>
         <span>Connecting...</span>
       </main>
     );
@@ -981,7 +981,7 @@ export function App() {
   if (!profileReady) {
     return (
       <main className="loading-shell" aria-live="polite">
-        <div className="loading-mark" aria-hidden="true">J</div>
+        <div className="loading-mark" aria-hidden="true">S</div>
         <strong>Preparing your chats</strong>
         <span>Loading profile...</span>
       </main>
@@ -1013,7 +1013,7 @@ export function App() {
   }
 
   const tabLabel = activeTab === "chats"
-    ? searchOpen ? "Search" : "Java Chat"
+    ? searchOpen ? "Search" : "STAFI"
     : activeTab === "ai"
       ? "AI"
       : activeTab === "settings"

@@ -268,7 +268,7 @@ export function Stories({
                 onClick={() => setVisibility("public")}
               >
                 <Globe2 size={18} />
-                <span><strong>Public</strong><small>Everyone using Java Chat</small></span>
+                <span><strong>Public</strong><small>Everyone using STAFI</small></span>
               </button>
             </fieldset>
             {status && <p className="form-error" role="status">{status}</p>}
