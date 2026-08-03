@@ -1,4 +1,4 @@
-import { Client } from "@stomp/stompjs";
+﻿import { Client } from "@stomp/stompjs";
 import {
   Bell,
   Bot,
@@ -85,6 +85,15 @@ function applyLocalReaction(message: Message, reaction?: MessageReaction): Messa
   return { ...message, reactions, ownReaction: reaction };
 }
 
+function replyPreviewFor(message: Message | undefined) {
+  if (!message) return undefined;
+  if (message.type === "voice") return "Voice message";
+  if (message.type === "photo") return "Photo";
+  if (message.type === "video") return "Video";
+  if (message.type === "file") return `File: ${message.body || "Attachment"}`;
+  return message.body;
+}
+
 export function App() {
   const [ready, setReady] = useState(!isSupabaseConfigured);
   const [loggedIn, setLoggedIn] = useState(!isSupabaseConfigured);
@@ -142,9 +151,15 @@ export function App() {
       .forEach((message) => {
         previews[message.conversationId] = message.type === "voice"
           ? "Voice message"
-          : message.type === "ai"
-            ? `AI: ${message.body || "New response"}`
-            : message.body || "New message";
+          : message.type === "photo"
+            ? "Photo"
+            : message.type === "video"
+              ? "Video"
+              : message.type === "file"
+                ? `File: ${message.body || "Attachment"}`
+                : message.type === "ai"
+                  ? `AI: ${message.body || "New response"}`
+                  : message.body || "New message";
       });
     return previews;
   }, [messages]);
@@ -182,7 +197,13 @@ export function App() {
     if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
     const preview = message.type === "voice"
       ? "Voice message"
-      : message.body || "New message";
+      : message.type === "photo"
+        ? "Photo"
+        : message.type === "video"
+          ? "Video"
+          : message.type === "file"
+            ? `File: ${message.body || "Attachment"}`
+            : message.body || "New message";
     new Notification(conversation.title, {
       body: preview,
       tag: conversation.id,
@@ -197,7 +218,9 @@ export function App() {
       }
       const existing = current.find((item) => item.id === message.id);
       if (!existing) return [...current, message];
-      const stableMediaPath = message.type === "voice" && existing.mediaPath
+      const isMedia = message.type === "voice" || message.type === "photo"
+        || message.type === "video" || message.type === "file";
+      const stableMediaPath = isMedia && existing.mediaPath
         ? existing.mediaPath
         : message.mediaPath;
       const next = preserveViewerState
@@ -217,7 +240,9 @@ export function App() {
       const currentById = new Map(current.map((message) => [message.id, message]));
       const stableIncoming = incoming.map((message) => {
         const existing = currentById.get(message.id);
-        return message.type === "voice" && existing?.mediaPath
+        const isMedia = message.type === "voice" || message.type === "photo"
+          || message.type === "video" || message.type === "file";
+        return isMedia && existing?.mediaPath
           ? { ...message, mediaPath: existing.mediaPath }
           : message;
       });
@@ -458,7 +483,7 @@ export function App() {
       type: "text",
       body,
       replyToMessageId,
-      replyPreview: replyingTo?.type === "voice" ? "Voice message" : replyingTo?.body,
+      replyPreview: replyPreviewFor(replyingTo),
       reactions: {},
       status: "sent",
       createdAt: new Date().toISOString()
@@ -487,7 +512,7 @@ export function App() {
       type: "text",
       body,
       replyToMessageId,
-      replyPreview: replyingTo?.type === "voice" ? "Voice message" : replyingTo?.body,
+      replyPreview: replyPreviewFor(replyingTo),
       reactions: {},
       status: "sent",
       createdAt: new Date().toISOString()
@@ -556,7 +581,7 @@ export function App() {
       type: "voice",
       mediaPath: uploaded.url,
       replyToMessageId,
-      replyPreview: replyingTo?.type === "voice" ? "Voice message" : replyingTo?.body,
+      replyPreview: replyPreviewFor(replyingTo),
       reactions: {},
       status: "sent",
       createdAt: new Date().toISOString()
@@ -586,6 +611,51 @@ export function App() {
       message.id === messageId ? { ...message, mediaPath: refreshed.mediaPath } : message
     ));
     return refreshed.mediaPath;
+  }
+
+  async function sendMedia(file: File, replyToMessageId?: string) {
+    if (!active) return;
+    const mimeType = file.type.toLowerCase();
+    const type = mimeType.startsWith("image/")
+      ? "photo"
+      : mimeType.startsWith("video/")
+        ? "video"
+        : "file";
+    const extension = file.name.split(".").pop()
+      || (type === "photo" ? "jpg" : type === "video" ? "mp4" : "bin");
+    const uploaded = await uploadMedia("chat-files", file, extension);
+    const replyingTo = replyToMessageId
+      ? activeMessages.find((message) => message.id === replyToMessageId)
+      : undefined;
+    const id = crypto.randomUUID();
+    const message: Message = {
+      id,
+      conversationId: active.id,
+      senderId: "me",
+      type,
+      body: type === "file" ? file.name : undefined,
+      mediaPath: uploaded.url,
+      replyToMessageId,
+      replyPreview: replyPreviewFor(replyingTo),
+      reactions: {},
+      status: "sent",
+      createdAt: new Date().toISOString()
+    };
+    setMessages((current) => [...current, message]);
+    try {
+      const saved = await apiPost<Message>("/api/messages", {
+        id,
+        conversationId: active.id,
+        type,
+        body: type === "file" ? file.name : undefined,
+        mediaPath: uploaded.path,
+        replyToMessageId
+      });
+      upsertMessage(saved);
+    } catch (error) {
+      setMessages((current) => current.filter((item) => item.id !== id));
+      throw error;
+    }
   }
 
   async function deleteMessage(message: Message, mode: "me" | "all") {
@@ -749,7 +819,7 @@ export function App() {
       text: action === "summarize"
         ? "AI summary is ready once the Java backend is running."
         : action === "draft-reply"
-          ? "Suggested reply: Thanks for the update. I’ll get back to you shortly."
+          ? "Suggested reply: Thanks for the update. Iâ€™ll get back to you shortly."
           : "AI assistant is ready once the Java backend is running."
     }));
 
@@ -1055,6 +1125,7 @@ export function App() {
         onToggleTheme={toggleTheme}
         onSend={send}
         onSendVoice={sendVoice}
+        onSendMedia={sendMedia}
         onRefreshVoice={refreshVoiceMedia}
         onAskAi={askAi}
         onDelete={deleteMessage}

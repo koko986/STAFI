@@ -18,6 +18,7 @@ import java.util.UUID;
 @Service
 public class StorageService {
     private static final long STORY_VIDEO_MAX_BYTES = 12L * 1024 * 1024;
+    private static final long CHAT_FILE_MAX_BYTES = 200L * 1024 * 1024;
     private static final Map<String, BucketRules> BUCKETS = Map.of(
             "avatars", new BucketRules(
                     5L * 1024 * 1024,
@@ -33,6 +34,23 @@ public class StorageService {
                     25L * 1024 * 1024,
                     Set.of("image/jpeg", "image/png", "image/webp", "video/mp4", "video/webm"),
                     false
+            ),
+            "chat-files", new BucketRules(
+                    CHAT_FILE_MAX_BYTES,
+                    Set.of(
+                            "image/jpeg", "image/png", "image/webp", "image/gif",
+                            "video/mp4", "video/webm", "video/quicktime",
+                            "audio/mpeg", "audio/mp4", "audio/wav", "audio/ogg", "audio/webm",
+                            "application/pdf", "application/zip",
+                            "application/msword",
+                            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            "application/vnd.ms-excel",
+                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            "application/vnd.ms-powerpoint",
+                            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                            "text/plain", "text/csv", "text/markdown"
+                    ),
+                    false
             )
     );
 
@@ -40,12 +58,26 @@ public class StorageService {
             Map.entry("image/jpeg", "jpg"),
             Map.entry("image/png", "png"),
             Map.entry("image/webp", "webp"),
+            Map.entry("image/gif", "gif"),
             Map.entry("audio/webm", "webm"),
             Map.entry("audio/ogg", "ogg"),
             Map.entry("audio/mpeg", "mp3"),
             Map.entry("audio/mp4", "m4a"),
+            Map.entry("audio/wav", "wav"),
             Map.entry("video/mp4", "mp4"),
-            Map.entry("video/webm", "webm")
+            Map.entry("video/webm", "webm"),
+            Map.entry("video/quicktime", "mov"),
+            Map.entry("application/pdf", "pdf"),
+            Map.entry("application/zip", "zip"),
+            Map.entry("application/msword", "doc"),
+            Map.entry("application/vnd.openxmlformats-officedocument.wordprocessingml.document", "docx"),
+            Map.entry("application/vnd.ms-excel", "xls"),
+            Map.entry("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "xlsx"),
+            Map.entry("application/vnd.ms-powerpoint", "ppt"),
+            Map.entry("application/vnd.openxmlformats-officedocument.presentationml.presentation", "pptx"),
+            Map.entry("text/plain", "txt"),
+            Map.entry("text/csv", "csv"),
+            Map.entry("text/markdown", "md")
     );
 
     private final RestClient restClient;

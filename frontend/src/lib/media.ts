@@ -7,7 +7,7 @@ export type StoredMedia = {
 };
 
 export async function uploadMedia(
-  bucket: "avatars" | "voice-messages" | "stories",
+  bucket: "avatars" | "voice-messages" | "stories" | "chat-files",
   file: Blob,
   extension: string
 ): Promise<StoredMedia> {
@@ -27,7 +27,7 @@ export async function uploadMedia(
 }
 
 export async function storeMedia(
-  bucket: "avatars" | "voice-messages" | "stories",
+  bucket: "avatars" | "voice-messages" | "stories" | "chat-files",
   file: Blob,
   extension: string
 ) {

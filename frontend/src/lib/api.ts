@@ -107,7 +107,7 @@ export type Message = {
   id: string;
   conversationId: string;
   senderId?: string;
-  type: "text" | "voice" | "ai";
+  type: "text" | "voice" | "photo" | "video" | "file" | "ai";
   body?: string;
   mediaPath?: string;
   replyToMessageId?: string;

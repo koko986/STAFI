@@ -94,29 +94,31 @@ public class ChatService {
                 )
         );
         List<Message> messages = new ArrayList<>();
-        if (rows != null && rows.isArray()) rows.forEach(row -> messages.add(toMessage(row)));
+        if (rows != null && rows.isArray()) {
+            rows.forEach(row -> messages.add(toMessage(row)));
+        }
         Set<UUID> hiddenMessageIds = hiddenMessageIds(userId);
-        messages = messages.stream()
+        List<Message> visibleMessages = messages.stream()
                 .filter(message -> !hiddenMessageIds.contains(message.id()))
                 .toList();
-        if (messages.isEmpty()) return List.of();
-        if (!messages.isEmpty()) {
+        if (visibleMessages.isEmpty()) return List.of();
+        if (!visibleMessages.isEmpty()) {
             database.update(
                     "conversation_members",
                     Map.of(
                             "conversation_id", "eq." + conversationId,
                             "user_id", "eq." + userId
                     ),
-                    Map.of("last_read_message_id", messages.get(messages.size() - 1).id())
+                    Map.of("last_read_message_id", visibleMessages.get(visibleMessages.size() - 1).id())
             );
         }
-        return hydrateMessages(messages, userId);
+        return hydrateMessages(visibleMessages, userId);
     }
 
     public Message addMessage(Message request, UUID userId) {
         requireMembership(request.conversationId(), userId);
         String type = request.type().trim().toLowerCase();
-        if (!List.of("text", "voice").contains(type)) {
+        if (!List.of("text", "voice", "photo", "video", "file").contains(type)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported message type.");
         }
         if (request.replyToMessageId() != null) {
@@ -601,8 +603,12 @@ public class ChatService {
 
     private String resolveMessageMedia(JsonNode row) {
         String path = textOrNull(row, "media_path");
-        return "voice".equals(row.path("type").asText())
-                ? storageService.resolveUrl("voice-messages", path)
+        String type = row.path("type").asText();
+        if ("voice".equals(type)) {
+            return storageService.resolveUrl("voice-messages", path);
+        }
+        return ("photo".equals(type) || "video".equals(type) || "file".equals(type))
+                ? storageService.resolveUrl("chat-files", path)
                 : path;
     }
 

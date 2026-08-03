@@ -3,10 +3,12 @@ import {
   Check,
   CheckCheck,
   ChevronLeft,
+  File as FileIcon,
   Forward,
   LoaderCircle,
   Mic,
   Moon,
+  Paperclip,
   Reply,
   Send,
   Square,
@@ -16,7 +18,7 @@ import {
   WandSparkles,
   X
 } from "lucide-react";
-import { FormEvent, KeyboardEvent, MouseEvent, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, FormEvent, KeyboardEvent, MouseEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { Conversation, Message, MessageReaction } from "../lib/api";
 import { VoiceMessage } from "./VoiceMessage";
 
@@ -42,6 +44,7 @@ type Props = {
   onToggleTheme: () => void;
   onSend: (body: string, replyToMessageId?: string) => void;
   onSendVoice: (voice: Blob, replyToMessageId?: string) => Promise<void>;
+  onSendMedia: (file: File, replyToMessageId?: string) => Promise<void>;
   onRefreshVoice: (messageId: string) => Promise<string>;
   onAskAi: (action: "summarize" | "draft-reply") => void;
   onBack: () => void;
@@ -61,6 +64,7 @@ export function ChatWindow({
   onToggleTheme,
   onSend,
   onSendVoice,
+  onSendMedia,
   onRefreshVoice,
   onAskAi,
   onBack,
@@ -73,13 +77,16 @@ export function ChatWindow({
   const [body, setBody] = useState("");
   const [recording, setRecording] = useState(false);
   const [sendingVoice, setSendingVoice] = useState(false);
+  const [sendingMedia, setSendingMedia] = useState(false);
   const [voiceError, setVoiceError] = useState<string>();
+  const [mediaError, setMediaError] = useState<string>();
   const [selectedMessageId, setSelectedMessageId] = useState<string>();
   const [replyingTo, setReplyingTo] = useState<Message>();
   const [forwardingMessageId, setForwardingMessageId] = useState<string>();
   const [deleteCandidate, setDeleteCandidate] = useState<Message>();
   const recorderRef = useRef<MediaRecorder>();
   const chunksRef = useRef<Blob[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const messageRefs = useRef<Record<string, HTMLElement | null>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -98,6 +105,7 @@ export function ChatWindow({
     setForwardingMessageId(undefined);
     setDeleteCandidate(undefined);
     setVoiceError(undefined);
+    setMediaError(undefined);
   }, [conversation?.id]);
 
   useEffect(() => {
@@ -115,6 +123,31 @@ export function ChatWindow({
     onSend(body.trim(), replyingTo?.id);
     setBody("");
     setReplyingTo(undefined);
+  }
+
+  function pickFiles(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    void sendMediaFile(file);
+  }
+
+  async function sendMediaFile(file: File) {
+    setMediaError(undefined);
+    if (sendingMedia) return;
+    if (file.size > 200 * 1024 * 1024) {
+      setMediaError("Files must be 200 MB or smaller.");
+      return;
+    }
+    setSendingMedia(true);
+    try {
+      await onSendMedia(file, replyingTo?.id);
+      setReplyingTo(undefined);
+    } catch {
+      setMediaError("The file could not be sent. Please try again.");
+    } finally {
+      setSendingMedia(false);
+    }
   }
 
   async function toggleRecording() {
@@ -300,6 +333,25 @@ export function ChatWindow({
                   onRefresh={onRefreshVoice}
                   onOpenActions={(event) => selectMessage(event, message)}
                 />
+              ) : message.type === "photo" && message.mediaPath ? (
+                <img className="message-media" src={message.mediaPath} alt={message.body || "Photo"} loading="lazy" />
+              ) : message.type === "video" && message.mediaPath ? (
+                <video className="message-media" src={message.mediaPath} controls preload="metadata" />
+              ) : message.type === "file" && message.mediaPath ? (
+                <a
+                  className="message-file"
+                  href={message.mediaPath}
+                  download={message.body || "attachment"}
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <span className="message-file-icon" aria-hidden="true">
+                    <FileIcon size={22} />
+                  </span>
+                  <span className="message-file-copy">
+                    <strong>{message.body || "Attachment"}</strong>
+                    <small>Download file</small>
+                  </span>
+                </a>
               ) : <p>{message.body}</p>}
               <footer className="message-footer">
                 <ReactionSummary message={message} onToggle={toggleReaction} />
@@ -448,12 +500,20 @@ export function ChatWindow({
             </button>
           </div>
         )}
+        {mediaError && (
+          <div className="voice-error" role="alert">
+            <span>{mediaError}</span>
+            <button type="button" title="Dismiss error" onClick={() => setMediaError(undefined)}>
+              <X size={15} />
+            </button>
+          </div>
+        )}
         {replyingTo && (
           <div className="replying-bar">
             <span className="reply-accent" aria-hidden="true" />
             <span className="reply-copy">
               <strong>Reply to {senderLabel(replyingTo)}</strong>
-              <small>{replyingTo.type === "voice" ? "Voice message" : replyingTo.body}</small>
+              <small>{replyingTo.type === "voice" ? "Voice message" : replyingTo.type === "photo" ? "Photo" : replyingTo.type === "video" ? "Video" : replyingTo.type === "file" ? `File: ${replyingTo.body || "Attachment"}` : replyingTo.body}</small>
             </span>
             <button type="button" title="Cancel reply" onClick={() => setReplyingTo(undefined)}>
               <X size={16} />
@@ -461,6 +521,22 @@ export function ChatWindow({
           </div>
         )}
         <form className="composer" onSubmit={submit}>
+          <input
+            ref={fileInputRef}
+            className="composer-file-input"
+            type="file"
+            accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.md,.zip,.mp3,.m4a,.wav,.ogg,.mov"
+            onChange={pickFiles}
+            hidden
+          />
+          <button
+            type="button"
+            title="Attach a file, photo, or video"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={sendingMedia || sendingVoice}
+          >
+            {sendingMedia ? <LoaderCircle className="spin" size={18} /> : <Paperclip size={18} />}
+          </button>
           <button
             className={recording ? "recording" : ""}
             type="button"
@@ -471,7 +547,7 @@ export function ChatWindow({
             {sendingVoice ? <LoaderCircle className="spin" size={18} /> : recording ? <Square size={16} /> : <Mic size={18} />}
           </button>
           <input value={body} onChange={(event) => setBody(event.target.value)} placeholder={replyingTo ? "Reply..." : "Message..."} />
-          <button type="submit" title="Send">
+          <button type="submit" title="Send" disabled={sendingMedia || sendingVoice}>
             <Send size={18} />
           </button>
         </form>
