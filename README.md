@@ -101,36 +101,28 @@ profile or conversation data. The latest message deletion migration is
 
 ## Configure AI
 
-The Java backend supports OpenAI-compatible chat completions out of the box. Set an API key before
-starting the backend:
+The AI assistant uses Google AI Studio (Gemini). Create API keys at
+https://aistudio.google.com and set them on the Java backend. Three separate keys keep
+usage separated per feature:
 
 ```powershell
-$env:OPENAI_API_KEY="your-api-key"
+$env:GEMINI_SUMMARIZE_API_KEY="your-summarize-key"
+$env:GEMINI_VOICE_API_KEY="your-voice-key"
+$env:GEMINI_CONVERSATION_API_KEY="your-conversation-key"
 ```
 
-For DeepSeek:
-
-```powershell
-$env:DEEPSEEK_API_KEY="your-api-key"
-$env:DEEPSEEK_API_URL="https://api.deepseek.com/chat/completions"
-$env:DEEPSEEK_MODEL="deepseek-v4-flash"
-```
+- Chat, draft-reply, and question requests use the **conversation** key.
+- Voice assistant requests use the **voice** key.
+- Summaries use the **summarize** key.
 
 Optional overrides:
 
 ```powershell
-$env:AI_API_URL="https://api.openai.com/v1/chat/completions"
-$env:AI_MODEL="gpt-4o-mini"
+$env:GEMINI_MODEL="gemini-3.5-flash"
+$env:GEMINI_API_URL="https://generativelanguage.googleapis.com/v1beta"
 ```
 
-For a local model, run an Ollama-compatible server and optionally set:
-
-```powershell
-$env:AI_LOCAL_API_URL="http://localhost:11434/api/chat"
-$env:AI_LOCAL_MODEL="llama3.2"
-```
-
-If no hosted key or local model is available, Java Chat now uses a simple offline assistant fallback
+If no Gemini key is configured, the backend falls back to a simple offline assistant
 instead of showing a configuration error.
 
 ## Production Notes

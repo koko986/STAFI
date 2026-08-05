@@ -45,7 +45,6 @@ import {
   type StoryReaction
 } from "./lib/api";
 import { storeMedia, uploadMedia } from "./lib/media";
-import { isPuterReady, loadPuterSdk, puterChat } from "./lib/puter";
 import { isSupabaseConfigured, supabase } from "./lib/supabase";
 
 const fallbackConversations: Conversation[] = [
@@ -95,28 +94,12 @@ function replyPreviewFor(message: Message | undefined) {
   return message.body;
 }
 
-function puterSystemInstruction(action: string) {
-  switch (action) {
-    case "summarize":
-      return "Summarize this chat accurately in concise bullet points. Do not invent facts.";
-    case "question":
-      return "Answer the user's question using the provided chat context when relevant. Be concise, useful, and clear when the context is missing.";
-    case "draft-reply":
-      return "Draft one friendly, concise reply to the chat. Return only the reply.";
-    default:
-      return "You are a concise conversational assistant inside a private chat application. Ask helpful follow-up questions when the user is unclear.";
-  }
-}
-
 export function App() {
   const [ready, setReady] = useState(!isSupabaseConfigured);
   const [loggedIn, setLoggedIn] = useState(!isSupabaseConfigured);
   const [demoMode, setDemoMode] = useState(!isSupabaseConfigured);
   const [theme, setTheme] = useState<"light" | "dark">(
     () => (localStorage.getItem("java-chat-theme") as "light" | "dark") || "light"
-  );
-  const [puterEnabled, setPuterEnabled] = useState(
-    () => localStorage.getItem("java-chat-ai-puter") === "on"
   );
   const [profile, setProfile] = useState<Profile>();
   const [profileReady, setProfileReady] = useState(!isSupabaseConfigured);
@@ -556,16 +539,11 @@ export function App() {
         return `${speaker}: ${message.body}`;
       })
       .join("\n");
-    const response = puterEnabled
-      ? await aiRequest("chat", context).then(
-          (text): AiApiResponse => ({ text }),
-          (): AiApiResponse => ({ text: "Puter AI is not available right now." })
-        )
-      : await apiPost<AiApiResponse>("/api/ai/chat", {
-          conversationId: active.id,
-          action: "chat",
-          prompt: context
-        }).catch((): AiApiResponse => ({ text: "AI assistant is ready once the Java backend and AI provider are configured." }));
+    const response = await apiPost<AiApiResponse>("/api/ai/chat", {
+      conversationId: active.id,
+      action: "chat",
+      prompt: context
+    }).catch((): AiApiResponse => ({ text: "AI assistant is ready once the Java backend and AI provider are configured." }));
     if (response.message) {
       upsertMessage(response.message);
     } else {
@@ -798,27 +776,10 @@ export function App() {
     if (found) setFriendProfile(found);
   }
 
-  function togglePuter() {
-    const next = !puterEnabled;
-    setPuterEnabled(next);
-    localStorage.setItem("java-chat-ai-puter", next ? "on" : "off");
-    if (next) void loadPuterSdk();
-  }
-
   async function aiRequest(
     action: "summarize" | "draft-reply" | "question" | "chat",
     prompt: string
   ): Promise<string> {
-    if (puterEnabled) {
-      await loadPuterSdk();
-      if (!isPuterReady()) {
-        throw new Error("Puter AI is not loaded yet. Enable it in Settings.");
-      }
-      return puterChat(
-        `System instruction: ${puterSystemInstruction(action)}\n\n${prompt}`,
-        { model: "gpt-5-nano" }
-      );
-    }
     const endpoint = action === "chat" ? "chat" : action;
     const response = await apiPost<{ text: string }>(`/api/ai/${endpoint}`, {
       conversationId: active?.id,
@@ -1129,8 +1090,6 @@ export function App() {
             theme={theme}
             demoMode={demoMode}
             accountContact={accountContact}
-            puterEnabled={puterEnabled}
-            onTogglePuter={togglePuter}
             onToggleTheme={toggleTheme}
             onOpenProfile={() => openTab("profile")}
             onSignOut={signOut}
@@ -1392,8 +1351,6 @@ function SettingsTab({
   theme,
   demoMode,
   accountContact,
-  puterEnabled,
-  onTogglePuter,
   onToggleTheme,
   onOpenProfile,
   onSignOut
@@ -1401,8 +1358,6 @@ function SettingsTab({
   theme: "light" | "dark";
   demoMode: boolean;
   accountContact: string;
-  puterEnabled: boolean;
-  onTogglePuter: () => void;
   onToggleTheme: () => void;
   onOpenProfile: () => void;
   onSignOut: () => void;
@@ -1417,14 +1372,6 @@ function SettingsTab({
             <small>{theme === "dark" ? "Dark glass" : "Light glass"}</small>
           </span>
           <ChevronRight size={17} />
-        </button>
-        <button className="glass-row" type="button" onClick={onTogglePuter}>
-          <span className="setting-icon"><Sparkles size={19} /></span>
-          <span>
-            <strong>Puter AI</strong>
-            <small>{puterEnabled ? "AI runs in your browser via puter.ai.chat" : "AI runs on the Java backend"}</small>
-          </span>
-          <span className={`info-switch${puterEnabled ? " active" : ""}`} aria-hidden="true"><span /></span>
         </button>
         <button className="glass-row" type="button" onClick={onOpenProfile}>
           <span className="setting-icon"><Palette size={19} /></span>

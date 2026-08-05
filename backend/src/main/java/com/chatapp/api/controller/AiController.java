@@ -51,4 +51,12 @@ public class AiController {
                 userContext.requireUserId(jwt)
         );
     }
+
+    @PostMapping("/voice")
+    public AiResponse voice(@Valid @RequestBody AiRequest request, @AuthenticationPrincipal Jwt jwt) {
+        return aiService.respond(
+                new AiRequest(request.conversationId(), "voice", request.prompt()),
+                userContext.requireUserId(jwt)
+        );
+    }
 }

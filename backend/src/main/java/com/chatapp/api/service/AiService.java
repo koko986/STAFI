@@ -4,43 +4,49 @@ import com.chatapp.api.model.AiRequest;
 import com.chatapp.api.model.AiResponse;
 import com.chatapp.api.model.Message;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
-import java.util.List;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
 @Service
 public class AiService {
+    private static final Logger log = LoggerFactory.getLogger(AiService.class);
+
     private final RestClient restClient;
-    private final String apiUrl;
+    private final String geminiUrl;
     private final String model;
-    private final String apiKey;
-    private final String localApiUrl;
-    private final String localModel;
+    private final String summarizeKey;
+    private final String voiceKey;
+    private final String conversationKey;
     private final SupabaseDatabase database;
     private final ChatService chatService;
 
     public AiService(
             RestClient.Builder restClientBuilder,
-            @Value("${app.ai-api-url:}") String apiUrl,
-            @Value("${app.ai-model:}") String model,
-            @Value("${app.ai-api-key:}") String apiKey,
-            @Value("${app.ai-local-api-url:}") String localApiUrl,
-            @Value("${app.ai-local-model:}") String localModel,
+            @Value("${app.gemini-api-url:}") String geminiUrl,
+            @Value("${app.gemini-model:}") String model,
+            @Value("${app.gemini-summarize-key:}") String summarizeKey,
+            @Value("${app.gemini-voice-key:}") String voiceKey,
+            @Value("${app.gemini-conversation-key:}") String conversationKey,
             SupabaseDatabase database,
             ChatService chatService
     ) {
         this.restClient = restClientBuilder.build();
-        this.apiUrl = apiUrl;
+        this.geminiUrl = geminiUrl.replaceAll("/+$", "");
         this.model = model;
-        this.apiKey = apiKey;
-        this.localApiUrl = localApiUrl;
-        this.localModel = localModel;
+        this.summarizeKey = summarizeKey;
+        this.voiceKey = voiceKey;
+        this.conversationKey = conversationKey;
         this.database = database;
         this.chatService = chatService;
     }
@@ -51,8 +57,7 @@ public class AiService {
         }
 
         String normalizedAction = normalizeAction(request.action());
-        AiResponse response;
-        response = new AiResponse(request.action(), aiText(request));
+        AiResponse response = new AiResponse(request.action(), aiText(request));
 
         Message savedMessage = null;
         if ("chat".equals(normalizedAction)
@@ -77,61 +82,77 @@ public class AiService {
             case "summarize" -> "Summarize this chat accurately in concise bullet points. Do not invent facts.";
             case "question" -> "Answer the user's question using the provided chat context when relevant. Be concise, useful, and clear when the context is missing.";
             case "draft-reply" -> "Draft one friendly, concise reply to the chat. Return only the reply.";
+            case "voice" -> "You are a concise voice assistant inside a private chat application. Speak in short, natural sentences because your answers are read aloud.";
             default -> "You are a concise conversational assistant inside a private chat application. Ask helpful follow-up questions when the user is unclear.";
         };
     }
 
     private String aiText(AiRequest request) {
-        String hosted = hostedProviderResponse(request);
-        if (hosted != null) return hosted;
-        String local = localProviderResponse(request);
-        return local == null ? offlineResponse(request) : local;
+        String action = normalizeAction(request.action());
+        String key = apiKeyFor(action);
+        if (!geminiUrl.isBlank() && !model.isBlank() && !key.isBlank()) {
+            String hosted = geminiResponse(action, key, request.prompt());
+            if (hosted != null) return hosted;
+        }
+        return offlineResponse(request);
     }
 
-    private String hostedProviderResponse(AiRequest request) {
-        if (apiUrl.isBlank() || model.isBlank() || apiKey.isBlank()) return null;
+    private String apiKeyFor(String action) {
+        return switch (action) {
+            case "summarize" -> firstConfigured(summarizeKey, conversationKey, voiceKey);
+            case "voice" -> firstConfigured(voiceKey, conversationKey, summarizeKey);
+            default -> firstConfigured(conversationKey, summarizeKey, voiceKey);
+        };
+    }
+
+    private String firstConfigured(String... keys) {
+        for (String key : keys) {
+            if (key != null && !key.isBlank()) return key;
+        }
+        return "";
+    }
+
+    private String geminiResponse(String action, String apiKey, String prompt) {
         try {
+            Map<String, Object> requestBody = new LinkedHashMap<>();
+            requestBody.put("systemInstruction", Map.of("parts", List.of(Map.of("text", systemInstruction(action)))));
+            requestBody.put("contents", List.of(Map.of(
+                    "role", "user",
+                    "parts", List.of(Map.of("text", prompt))
+            )));
+            requestBody.put("generationConfig", Map.of("temperature", 0.45));
+
             JsonNode result = restClient.post()
-                    .uri(apiUrl)
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
-                    .body(Map.of(
-                            "model", model,
-                            "messages", List.of(
-                                    Map.of("role", "system", "content", systemInstruction(request.action())),
-                                    Map.of("role", "user", "content", request.prompt())
-                            ),
-                            "temperature", 0.45
-                    ))
+                    .uri(geminiUrl + "/models/" + model + ":generateContent?key=" + apiKey)
+                    .body(requestBody)
                     .retrieve()
                     .body(JsonNode.class);
-            String text = result == null
-                    ? ""
-                    : result.path("choices").path(0).path("message").path("content").asText("");
+
+            JsonNode parts = result == null ? null : result.path("candidates").path(0).path("content").path("parts");
+            if (parts == null || !parts.isArray()) return null;
+            List<String> pieces = new ArrayList<>();
+            for (JsonNode part : parts) {
+                String text = part.path("text").asText("");
+                if (!text.isBlank()) pieces.add(text);
+            }
+            String text = String.join("", pieces).trim();
             return text.isBlank() ? null : text;
+        } catch (RestClientResponseException exception) {
+            log.warn("Gemini API rejected the request ({}): {}", exception.getStatusCode(), responseError(exception));
+            return null;
         } catch (RuntimeException exception) {
+            log.warn("Gemini API request failed: {}", exception.getMessage());
             return null;
         }
     }
 
-    private String localProviderResponse(AiRequest request) {
-        if (localApiUrl.isBlank() || localModel.isBlank()) return null;
+    private String responseError(RestClientResponseException exception) {
         try {
-            JsonNode result = restClient.post()
-                    .uri(localApiUrl)
-                    .body(Map.of(
-                            "model", localModel,
-                            "stream", false,
-                            "messages", List.of(
-                                    Map.of("role", "system", "content", systemInstruction(request.action())),
-                                    Map.of("role", "user", "content", request.prompt())
-                            )
-                    ))
-                    .retrieve()
-                    .body(JsonNode.class);
-            String text = result == null ? "" : result.path("message").path("content").asText("");
-            return text.isBlank() ? null : text;
-        } catch (RuntimeException exception) {
-            return null;
+            String body = exception.getResponseBodyAsString();
+            JsonNode error = new ObjectMapper().readTree(body);
+            return error.path("error").path("message").asText(body);
+        } catch (Exception ignored) {
+            return exception.getMessage();
         }
     }
 
@@ -141,6 +162,7 @@ public class AiService {
             case "summarize" -> summarizeOffline(prompt);
             case "question" -> answerOffline(prompt);
             case "draft-reply" -> "Thanks for the update. I will check it and get back to you shortly.";
+            case "voice" -> chatOffline(prompt);
             default -> chatOffline(prompt);
         };
     }
@@ -193,7 +215,7 @@ public class AiService {
 
     private String normalizeAction(String action) {
         return switch (action) {
-            case "summarize", "draft-reply", "question" -> action;
+            case "summarize", "draft-reply", "question", "voice" -> action;
             default -> "chat";
         };
     }
