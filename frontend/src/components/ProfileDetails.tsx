@@ -1,5 +1,5 @@
 import { AtSign, Camera, Info, Mail, Pencil, Phone, UserRound, X } from "lucide-react";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { type Profile } from "../lib/api";
 import { storeMedia } from "../lib/media";
 
@@ -25,21 +25,28 @@ export function ProfileDetails({ profile, accountContact, open, onClose, onSave 
     [avatarFile, profile.avatarPath]
   );
 
+  const wasOpen = useRef(false);
+
+  useEffect(() => {
+    if (open && !wasOpen.current) {
+      setEditing(false);
+      setDisplayName(profile.displayName);
+      setUsername(profile.username);
+      setBio(profile.bio || "");
+      setAvatarFile(undefined);
+      setStatus("");
+    }
+    wasOpen.current = open;
+  }, [open]);
+
   useEffect(() => {
     if (!open) return;
-    setEditing(false);
-    setDisplayName(profile.displayName);
-    setUsername(profile.username);
-    setBio(profile.bio || "");
-    setAvatarFile(undefined);
-    setStatus("");
-
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
     };
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [open, onClose, profile]);
+  }, [open, onClose]);
 
   useEffect(() => {
     return () => {
