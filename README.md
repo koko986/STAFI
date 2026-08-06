@@ -118,12 +118,12 @@ $env:GEMINI_CONVERSATION_API_KEY="your-conversation-key"
 Optional overrides:
 
 ```powershell
-$env:GEMINI_MODEL="gemini-3.5-flash"
+$env:GEMINI_MODEL="gemini-3.6-flash"
 $env:GEMINI_API_URL="https://generativelanguage.googleapis.com/v1beta"
 ```
 
-If no Gemini key is configured, the backend falls back to a simple offline assistant
-instead of showing a configuration error.
+If the configured model is overloaded or unavailable, the backend automatically tries
+`gemini-3.6-flash` and `gemini-2.5-flash` before falling back to the offline assistant.
 
 ## Production Notes
 

@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -35,7 +34,6 @@ public class SupabaseDatabase {
         this.objectMapper = objectMapper;
         this.configured = !normalizedUrl.isBlank() && !serviceKey.isBlank();
         this.restClient = restClientBuilder
-                .requestFactory(new HttpComponentsClientHttpRequestFactory())
                 .defaultHeader("apikey", serviceKey)
                 .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + serviceKey)
                 .defaultHeader(HttpHeaders.USER_AGENT, "JavaChatBackend/1.0")

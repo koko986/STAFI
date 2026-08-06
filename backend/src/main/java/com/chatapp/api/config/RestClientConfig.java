@@ -1,0 +1,24 @@
+package com.chatapp.api.config;
+
+import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.springframework.boot.web.client.RestClientCustomizer;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.http.client.ClientHttpRequestFactory;
+import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
+
+@Configuration
+public class RestClientConfig {
+
+    @Bean
+    RestClientCustomizer noReuseRestClientCustomizer() {
+        return builder -> builder.requestFactory(noReuseRequestFactory());
+    }
+
+    @Bean
+    ClientHttpRequestFactory noReuseRequestFactory() {
+        return new HttpComponentsClientHttpRequestFactory(HttpClients.custom()
+                .setConnectionReuseStrategy((request, response, context) -> false)
+                .build());
+    }
+}

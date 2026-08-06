@@ -24,7 +24,7 @@ app:
   supabase-url: ${SUPABASE_URL:}
   supabase-service-role-key: ${SUPABASE_SECRET_KEY:${SUPABASE_SERVICE_ROLE_KEY:}}
   gemini-api-url: ${GEMINI_API_URL:https://generativelanguage.googleapis.com/v1beta}
-  gemini-model: ${GEMINI_MODEL:gemini-3.5-flash}
+  gemini-model: ${GEMINI_MODEL:gemini-3.6-flash}
   gemini-summarize-key: ${GEMINI_SUMMARIZE_API_KEY:}
   gemini-voice-key: ${GEMINI_VOICE_API_KEY:}
   gemini-conversation-key: ${GEMINI_CONVERSATION_API_KEY:}

@@ -21,6 +21,7 @@ import java.util.UUID;
 @Service
 public class AiService {
     private static final Logger log = LoggerFactory.getLogger(AiService.class);
+    private static final List<String> FALLBACK_MODELS = List.of("gemini-3.6-flash", "gemini-2.5-flash");
 
     private final RestClient restClient;
     private final String geminiUrl;
@@ -113,37 +114,61 @@ public class AiService {
     }
 
     private String geminiResponse(String action, String apiKey, String prompt) {
-        try {
-            Map<String, Object> requestBody = new LinkedHashMap<>();
-            requestBody.put("systemInstruction", Map.of("parts", List.of(Map.of("text", systemInstruction(action)))));
-            requestBody.put("contents", List.of(Map.of(
-                    "role", "user",
-                    "parts", List.of(Map.of("text", prompt))
-            )));
-            requestBody.put("generationConfig", Map.of("temperature", 0.45));
+        for (String candidate : candidateModels()) {
+            try {
+                Map<String, Object> requestBody = new LinkedHashMap<>();
+                requestBody.put("systemInstruction", Map.of("parts", List.of(Map.of("text", systemInstruction(action)))));
+                requestBody.put("contents", List.of(Map.of(
+                        "role", "user",
+                        "parts", List.of(Map.of("text", prompt))
+                )));
+                requestBody.put("generationConfig", Map.of("temperature", 0.45));
 
-            JsonNode result = restClient.post()
-                    .uri(geminiUrl + "/models/" + model + ":generateContent?key=" + apiKey)
-                    .body(requestBody)
-                    .retrieve()
-                    .body(JsonNode.class);
+                JsonNode result = restClient.post()
+                        .uri(geminiUrl + "/models/" + candidate + ":generateContent?key=" + apiKey)
+                        .body(requestBody)
+                        .retrieve()
+                        .body(JsonNode.class);
 
-            JsonNode parts = result == null ? null : result.path("candidates").path(0).path("content").path("parts");
-            if (parts == null || !parts.isArray()) return null;
-            List<String> pieces = new ArrayList<>();
-            for (JsonNode part : parts) {
-                String text = part.path("text").asText("");
-                if (!text.isBlank()) pieces.add(text);
+                JsonNode parts = result == null ? null : result.path("candidates").path(0).path("content").path("parts");
+                if (parts == null || !parts.isArray()) {
+                    log.warn("Gemini model {} returned an unexpected response.", candidate);
+                    continue;
+                }
+                List<String> pieces = new ArrayList<>();
+                for (JsonNode part : parts) {
+                    String text = part.path("text").asText("");
+                    if (!text.isBlank()) pieces.add(text);
+                }
+                String text = String.join("", pieces).trim();
+                if (text.isBlank()) {
+                    log.warn("Gemini model {} returned an empty response.", candidate);
+                    continue;
+                }
+                return text;
+            } catch (RestClientResponseException exception) {
+                int status = exception.getStatusCode().value();
+                if (status == 429 || status == 404 || status >= 500) {
+                    log.warn("Gemini model {} unavailable ({}): {}", candidate, status, responseError(exception));
+                } else {
+                    log.warn("Gemini model {} rejected the request ({}): {}", candidate, status, responseError(exception));
+                    break;
+                }
+            } catch (RuntimeException exception) {
+                log.warn("Gemini API request failed: {}", exception.getMessage());
+                break;
             }
-            String text = String.join("", pieces).trim();
-            return text.isBlank() ? null : text;
-        } catch (RestClientResponseException exception) {
-            log.warn("Gemini API rejected the request ({}): {}", exception.getStatusCode(), responseError(exception));
-            return null;
-        } catch (RuntimeException exception) {
-            log.warn("Gemini API request failed: {}", exception.getMessage());
-            return null;
         }
+        return null;
+    }
+
+    private List<String> candidateModels() {
+        List<String> candidates = new ArrayList<>();
+        if (!model.isBlank()) candidates.add(model);
+        for (String fallback : FALLBACK_MODELS) {
+            if (!candidates.contains(fallback)) candidates.add(fallback);
+        }
+        return candidates;
     }
 
     private String responseError(RestClientResponseException exception) {
