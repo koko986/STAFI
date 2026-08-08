@@ -2,11 +2,14 @@ package com.chatapp.api.service;
 
 import com.chatapp.api.model.MediaUploadResponse;
 import com.fasterxml.jackson.databind.JsonNode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -14,9 +17,11 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class StorageService {
+    private static final Logger log = LoggerFactory.getLogger(StorageService.class);
     private static final long STORY_VIDEO_MAX_BYTES = 12L * 1024 * 1024;
     private static final long CHAT_FILE_MAX_BYTES = 200L * 1024 * 1024;
     private static final Map<String, BucketRules> BUCKETS = Map.of(
@@ -38,7 +43,7 @@ public class StorageService {
             "chat-files", new BucketRules(
                     CHAT_FILE_MAX_BYTES,
                     Set.of(
-                            "image/jpeg", "image/png", "image/webp", "image/gif",
+                            "image/jpeg", "image/png", "image/webp", "image/gif", "image/heic", "image/heif",
                             "video/mp4", "video/webm", "video/quicktime",
                             "audio/mpeg", "audio/mp4", "audio/wav", "audio/ogg", "audio/webm",
                             "application/pdf", "application/zip",
@@ -59,6 +64,8 @@ public class StorageService {
             Map.entry("image/png", "png"),
             Map.entry("image/webp", "webp"),
             Map.entry("image/gif", "gif"),
+            Map.entry("image/heic", "heic"),
+            Map.entry("image/heif", "heif"),
             Map.entry("audio/webm", "webm"),
             Map.entry("audio/ogg", "ogg"),
             Map.entry("audio/mpeg", "mp3"),
@@ -83,6 +90,7 @@ public class StorageService {
     private final RestClient restClient;
     private final String supabaseUrl;
     private final String serviceKey;
+    private final Set<String> ensuredBuckets = ConcurrentHashMap.newKeySet();
 
     public StorageService(
             RestClient.Builder restClientBuilder,
@@ -100,6 +108,7 @@ public class StorageService {
         if (rules == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported media bucket.");
         }
+        ensureBucket(bucket);
         if (file.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Choose a file to upload.");
         }
@@ -195,6 +204,42 @@ public class StorageService {
                     HttpStatus.SERVICE_UNAVAILABLE,
                     "Supabase storage is not configured on the Java backend."
             );
+        }
+    }
+
+    private void ensureBucket(String bucket) {
+        if (!ensuredBuckets.add(bucket)) return;
+        BucketRules rules = BUCKETS.get(bucket);
+        if (rules == null) return;
+        try {
+            restClient.get()
+                    .uri(supabaseUrl + "/storage/v1/bucket/" + bucket)
+                    .header("apikey", serviceKey)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + serviceKey)
+                    .retrieve()
+                    .toBodilessEntity();
+            return;
+        } catch (RestClientResponseException exception) {
+            if (exception.getStatusCode().value() != 404) {
+                log.warn("Could not check Supabase storage bucket '{}': {}", bucket, exception.getMessage());
+            }
+        }
+        try {
+            restClient.post()
+                    .uri(supabaseUrl + "/storage/v1/bucket")
+                    .header("apikey", serviceKey)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + serviceKey)
+                    .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                    .body(Map.of(
+                            "id", bucket,
+                            "name", bucket,
+                            "public", rules.publicRead()
+                    ))
+                    .retrieve()
+                    .toBodilessEntity();
+            log.info("Created Supabase storage bucket '{}'.", bucket);
+        } catch (RuntimeException exception) {
+            log.warn("Could not create Supabase storage bucket '{}': {}", bucket, exception.getMessage());
         }
     }
 

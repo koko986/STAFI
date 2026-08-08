@@ -23,8 +23,8 @@ app:
   supabase-jwks-url: ${SUPABASE_JWKS_URL:}
   supabase-url: ${SUPABASE_URL:}
   supabase-service-role-key: ${SUPABASE_SECRET_KEY:${SUPABASE_SERVICE_ROLE_KEY:}}
-  gemini-api-url: ${GEMINI_API_URL:https://generativelanguage.googleapis.com/v1beta}
-  gemini-model: ${GEMINI_MODEL:gemini-3.6-flash}
-  gemini-summarize-key: ${GEMINI_SUMMARIZE_API_KEY:}
-  gemini-voice-key: ${GEMINI_VOICE_API_KEY:}
-  gemini-conversation-key: ${GEMINI_CONVERSATION_API_KEY:}
+  groq-api-url: ${GROQ_API_URL:https://api.groq.com/openai/v1}
+  groq-model: ${GROQ_MODEL:llama-3.3-70b-versatile}
+  groq-summarize-key: ${GROQ_SUMMARIZE_API_KEY:}
+  groq-voice-key: ${GROQ_VOICE_API_KEY:}
+  groq-conversation-key: ${GROQ_CONVERSATION_API_KEY:}

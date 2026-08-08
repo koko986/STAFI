@@ -48,7 +48,7 @@ create table if not exists public.messages (
   id uuid primary key default gen_random_uuid(),
   conversation_id uuid not null references public.conversations(id) on delete cascade,
   sender_id uuid references public.profiles(id) on delete set null,
-  type text not null check (type in ('text', 'voice', 'ai')),
+  type text not null check (type in ('text', 'voice', 'ai', 'photo', 'video', 'file')),
   body text,
   media_path text,
   reply_to_message_id uuid references public.messages(id) on delete set null,
@@ -58,7 +58,7 @@ create table if not exists public.messages (
   deleted_at timestamptz,
   constraint messages_content_check check (
     (type in ('text', 'ai') and nullif(btrim(body), '') is not null)
-    or (type = 'voice' and nullif(btrim(media_path), '') is not null)
+    or (type in ('voice', 'photo', 'video', 'file') and nullif(btrim(media_path), '') is not null)
   )
 );
 
@@ -130,7 +130,7 @@ create table if not exists public.ai_events (
   id uuid primary key default gen_random_uuid(),
   requester_id uuid not null references public.profiles(id) on delete cascade,
   conversation_id uuid references public.conversations(id) on delete cascade,
-  action text not null check (action in ('chat', 'summarize', 'draft-reply')),
+  action text not null check (action in ('chat', 'summarize', 'draft-reply', 'question', 'voice')),
   prompt text not null,
   response text,
   created_at timestamptz not null default now()

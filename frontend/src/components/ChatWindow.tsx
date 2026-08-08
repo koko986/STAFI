@@ -525,7 +525,7 @@ export function ChatWindow({
             ref={fileInputRef}
             className="composer-file-input"
             type="file"
-            accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.md,.zip,.mp3,.m4a,.wav,.ogg,.mov"
+            accept="image/*,video/*,.heic,.heif,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.md,.zip,.mp3,.m4a,.wav,.ogg,.mov"
             onChange={pickFiles}
             hidden
           />

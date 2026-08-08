@@ -83,7 +83,18 @@ public class ChatService {
     }
 
     public List<Message> listMessages(UUID conversationId, UUID userId) {
-        requireMembership(conversationId, userId);
+        JsonNode membership = database.first(database.query(
+                "conversation_members",
+                Map.of(
+                        "conversation_id", "eq." + conversationId,
+                        "user_id", "eq." + userId,
+                        "select", "last_read_message_id",
+                        "limit", "1"
+                )
+        ));
+        if (membership == null) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not a member of this conversation.");
+        }
         JsonNode rows = database.query(
                 "messages",
                 Map.of(
@@ -102,14 +113,15 @@ public class ChatService {
                 .filter(message -> !hiddenMessageIds.contains(message.id()))
                 .toList();
         if (visibleMessages.isEmpty()) return List.of();
-        if (!visibleMessages.isEmpty()) {
+        UUID latestId = visibleMessages.get(visibleMessages.size() - 1).id();
+        if (!latestId.equals(uuidOrNull(membership, "last_read_message_id"))) {
             database.update(
                     "conversation_members",
                     Map.of(
                             "conversation_id", "eq." + conversationId,
                             "user_id", "eq." + userId
                     ),
-                    Map.of("last_read_message_id", visibleMessages.get(visibleMessages.size() - 1).id())
+                    Map.of("last_read_message_id", latestId)
             );
         }
         return hydrateMessages(visibleMessages, userId);

@@ -90,25 +90,28 @@ Run `supabase/schema.sql` in the Supabase SQL editor, then create three private 
 - `avatars`
 - `voice-messages`
 - `stories`
+- `chat-files`
 
 The schema creates a profile for each OAuth/phone user and enables row-level security. Review
-`supabase/storage.md` before deploying.
+`supabase/storage.md` before deploying. Missing storage buckets are created automatically by the
+backend on first upload.
 
 Rerun the schema after pulling database changes. It safely creates the chat, contact, story,
 message reaction, story reaction, reply, and delete-for-me structures without dropping existing
 profile or conversation data. The latest message deletion migration is
-`supabase/migrations/20260801222500_message_delete_for_me.sql`.
+`supabase/migrations/20260801222500_message_delete_for_me.sql`, and the media
+message and AI action migration is `supabase/migrations/20260808200000_media_messages_and_ai_actions.sql`.
 
 ## Configure AI
 
-The AI assistant uses Google AI Studio (Gemini). Create API keys at
-https://aistudio.google.com and set them on the Java backend. Three separate keys keep
+The AI assistant uses Groq (OpenAI-compatible API). Create API keys at
+https://console.groq.com and set them on the Java backend. Three separate keys keep
 usage separated per feature:
 
 ```powershell
-$env:GEMINI_SUMMARIZE_API_KEY="your-summarize-key"
-$env:GEMINI_VOICE_API_KEY="your-voice-key"
-$env:GEMINI_CONVERSATION_API_KEY="your-conversation-key"
+$env:GROQ_SUMMARIZE_API_KEY="your-summarize-key"
+$env:GROQ_VOICE_API_KEY="your-voice-key"
+$env:GROQ_CONVERSATION_API_KEY="your-conversation-key"
 ```
 
 - Chat, draft-reply, and question requests use the **conversation** key.
@@ -118,15 +121,15 @@ $env:GEMINI_CONVERSATION_API_KEY="your-conversation-key"
 Optional overrides:
 
 ```powershell
-$env:GEMINI_MODEL="gemini-3.6-flash"
-$env:GEMINI_API_URL="https://generativelanguage.googleapis.com/v1beta"
+$env:GROQ_MODEL="llama-3.3-70b-versatile"
+$env:GROQ_API_URL="https://api.groq.com/openai/v1"
 ```
 
 If the configured model is overloaded or unavailable, the backend automatically tries
-`gemini-3.6-flash` and `gemini-2.5-flash` before falling back to the offline assistant.
+`llama-3.3-70b-versatile` and `llama-3.1-8b-instant` before falling back to the offline assistant.
 
 ## Production Notes
 
 - Keep `SUPABASE_SECRET_KEY` on the Java server. Never expose it through a `VITE_` value.
-- Set `DEEPSEEK_API_KEY`, `OPENAI_API_KEY`, or `AI_API_KEY` on the Java server for real hosted AI responses.
+- Set `GROQ_SUMMARIZE_API_KEY`, `GROQ_VOICE_API_KEY`, and `GROQ_CONVERSATION_API_KEY` on the Java server for real hosted AI responses.
 - Pass only messages the authenticated user is authorized to read into AI requests.

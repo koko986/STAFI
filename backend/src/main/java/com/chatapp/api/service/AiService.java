@@ -21,10 +21,10 @@ import java.util.UUID;
 @Service
 public class AiService {
     private static final Logger log = LoggerFactory.getLogger(AiService.class);
-    private static final List<String> FALLBACK_MODELS = List.of("gemini-3.6-flash", "gemini-2.5-flash");
+    private static final List<String> FALLBACK_MODELS = List.of("llama-3.3-70b-versatile", "llama-3.1-8b-instant");
 
     private final RestClient restClient;
-    private final String geminiUrl;
+    private final String groqUrl;
     private final String model;
     private final String summarizeKey;
     private final String voiceKey;
@@ -34,16 +34,16 @@ public class AiService {
 
     public AiService(
             RestClient.Builder restClientBuilder,
-            @Value("${app.gemini-api-url:}") String geminiUrl,
-            @Value("${app.gemini-model:}") String model,
-            @Value("${app.gemini-summarize-key:}") String summarizeKey,
-            @Value("${app.gemini-voice-key:}") String voiceKey,
-            @Value("${app.gemini-conversation-key:}") String conversationKey,
+            @Value("${app.groq-api-url:}") String groqUrl,
+            @Value("${app.groq-model:}") String model,
+            @Value("${app.groq-summarize-key:}") String summarizeKey,
+            @Value("${app.groq-voice-key:}") String voiceKey,
+            @Value("${app.groq-conversation-key:}") String conversationKey,
             SupabaseDatabase database,
             ChatService chatService
     ) {
         this.restClient = restClientBuilder.build();
-        this.geminiUrl = geminiUrl.replaceAll("/+$", "");
+        this.groqUrl = groqUrl.replaceAll("/+$", "");
         this.model = model;
         this.summarizeKey = summarizeKey;
         this.voiceKey = voiceKey;
@@ -68,13 +68,17 @@ public class AiService {
             response = new AiResponse(response.action(), response.text(), savedMessage);
         }
 
-        Map<String, Object> event = new LinkedHashMap<>();
-        event.put("requester_id", requesterId);
-        event.put("conversation_id", request.conversationId());
-        event.put("action", normalizedAction);
-        event.put("prompt", request.prompt());
-        event.put("response", response.text());
-        database.insert("ai_events", event);
+        try {
+            Map<String, Object> event = new LinkedHashMap<>();
+            event.put("requester_id", requesterId);
+            event.put("conversation_id", request.conversationId());
+            event.put("action", normalizedAction);
+            event.put("prompt", request.prompt());
+            event.put("response", response.text());
+            database.insert("ai_events", event);
+        } catch (RuntimeException exception) {
+            log.warn("Could not record AI event: {}", exception.getMessage());
+        }
         return response;
     }
 
@@ -91,8 +95,8 @@ public class AiService {
     private String aiText(AiRequest request) {
         String action = normalizeAction(request.action());
         String key = apiKeyFor(action);
-        if (!geminiUrl.isBlank() && !model.isBlank() && !key.isBlank()) {
-            String hosted = geminiResponse(action, key, request.prompt());
+        if (!groqUrl.isBlank() && !model.isBlank() && !key.isBlank()) {
+            String hosted = groqResponse(action, key, request.prompt());
             if (hosted != null) return hosted;
         }
         return offlineResponse(request);
@@ -113,49 +117,43 @@ public class AiService {
         return "";
     }
 
-    private String geminiResponse(String action, String apiKey, String prompt) {
+    private String groqResponse(String action, String apiKey, String prompt) {
         for (String candidate : candidateModels()) {
             try {
                 Map<String, Object> requestBody = new LinkedHashMap<>();
-                requestBody.put("systemInstruction", Map.of("parts", List.of(Map.of("text", systemInstruction(action)))));
-                requestBody.put("contents", List.of(Map.of(
-                        "role", "user",
-                        "parts", List.of(Map.of("text", prompt))
-                )));
-                requestBody.put("generationConfig", Map.of("temperature", 0.45));
+                requestBody.put("model", candidate);
+                requestBody.put("messages", List.of(
+                        Map.of("role", "system", "content", systemInstruction(action)),
+                        Map.of("role", "user", "content", prompt)
+                ));
+                requestBody.put("temperature", 0.45);
 
                 JsonNode result = restClient.post()
-                        .uri(geminiUrl + "/models/" + candidate + ":generateContent?key=" + apiKey)
+                        .uri(groqUrl + "/chat/completions")
+                        .header("Authorization", "Bearer " + apiKey)
                         .body(requestBody)
                         .retrieve()
                         .body(JsonNode.class);
 
-                JsonNode parts = result == null ? null : result.path("candidates").path(0).path("content").path("parts");
-                if (parts == null || !parts.isArray()) {
-                    log.warn("Gemini model {} returned an unexpected response.", candidate);
-                    continue;
-                }
-                List<String> pieces = new ArrayList<>();
-                for (JsonNode part : parts) {
-                    String text = part.path("text").asText("");
-                    if (!text.isBlank()) pieces.add(text);
-                }
-                String text = String.join("", pieces).trim();
+                JsonNode content = result == null ? null : result.path("choices").path(0).path("message").path("content");
+                String text = content == null ? "" : content.asText("").trim();
                 if (text.isBlank()) {
-                    log.warn("Gemini model {} returned an empty response.", candidate);
+                    log.warn("Groq model {} returned an empty response.", candidate);
                     continue;
                 }
                 return text;
             } catch (RestClientResponseException exception) {
                 int status = exception.getStatusCode().value();
                 if (status == 429 || status == 404 || status >= 500) {
-                    log.warn("Gemini model {} unavailable ({}): {}", candidate, status, responseError(exception));
+                    log.warn("Groq model {} unavailable ({}): {}", candidate, status, responseError(exception));
+                } else if (status == 400 && responseError(exception).toLowerCase().contains("model")) {
+                    log.warn("Groq model {} not found ({}): {}", candidate, status, responseError(exception));
                 } else {
-                    log.warn("Gemini model {} rejected the request ({}): {}", candidate, status, responseError(exception));
+                    log.warn("Groq model {} rejected the request ({}): {}", candidate, status, responseError(exception));
                     break;
                 }
             } catch (RuntimeException exception) {
-                log.warn("Gemini API request failed: {}", exception.getMessage());
+                log.warn("Groq API request failed: {}", exception.getMessage());
                 break;
             }
         }

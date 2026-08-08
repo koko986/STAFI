@@ -829,7 +829,7 @@ export function App() {
         text: action === "summarize"
           ? "AI summary is ready once the Java backend is running."
           : action === "draft-reply"
-            ? "Suggested reply: Thanks for the update. Iâ€™ll get back to you shortly."
+            ? "Suggested reply: Thanks for the update. I'll get back to you shortly."
             : "AI assistant is ready once the Java backend is running."
       })
     );
