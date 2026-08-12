@@ -71,6 +71,9 @@ export function ChatDiscovery({
     return conversations.filter((conversation) => conversation.title.toLowerCase().includes(needle));
   }, [conversations, normalizedQuery]);
 
+  const pinnedConversations = visibleConversations.slice(0, Math.min(2, visibleConversations.length));
+  const recentConversations = visibleConversations.slice(pinnedConversations.length);
+
   useEffect(() => {
     if (!searchOpen) {
       setQuery("");
@@ -507,15 +510,32 @@ export function ChatDiscovery({
         )}
 
         <section className="chat-results" aria-label="Chats">
-          <div className="section-label"><span>Chats</span></div>
-          <ConversationList
-            conversations={visibleConversations}
-            activeId={activeId}
-            unreadCounts={unreadCounts}
-            onlineUserIds={onlineUserIds}
-            conversationPreviews={conversationPreviews}
-            onSelect={onSelect}
-          />
+          {pinnedConversations.length > 0 && (
+            <>
+              <div className="section-label"><span>Pinned</span></div>
+              <ConversationList
+                conversations={pinnedConversations}
+                activeId={activeId}
+                unreadCounts={unreadCounts}
+                onlineUserIds={onlineUserIds}
+                conversationPreviews={conversationPreviews}
+                onSelect={onSelect}
+              />
+            </>
+          )}
+          {recentConversations.length > 0 && (
+            <>
+              <div className="section-label recent-label"><span>Recent</span></div>
+              <ConversationList
+                conversations={recentConversations}
+                activeId={activeId}
+                unreadCounts={unreadCounts}
+                onlineUserIds={onlineUserIds}
+                conversationPreviews={conversationPreviews}
+                onSelect={onSelect}
+              />
+            </>
+          )}
           {!visibleConversations.length && <p className="empty-note">No matching chats.</p>}
         </section>
       </div>

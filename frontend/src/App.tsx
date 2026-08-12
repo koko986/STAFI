@@ -3,12 +3,14 @@ import {
   Bell,
   Bot,
   ChevronRight,
+  Layers,
   LogOut,
   Menu,
   MessageCircle,
   Mic,
   Moon,
   Palette,
+  PenLine,
   Search,
   Send,
   Settings,
@@ -17,6 +19,7 @@ import {
   Square,
   Sun,
   UserRound,
+  Users,
   Volume2
 } from "lucide-react";
 import SockJS from "sockjs-client";
@@ -974,12 +977,12 @@ export function App() {
   }
 
   const tabLabel = activeTab === "chats"
-    ? searchOpen ? "Search" : "STAFI"
+    ? searchOpen ? "Search" : "Chats"
     : activeTab === "ai"
-      ? "AI"
+      ? "Assistant"
       : activeTab === "settings"
         ? "Settings"
-        : "Profile";
+        : "People";
 
   return (
     <main className={`${theme === "dark" ? "app dark" : "app"} ${profileOpen || friendProfile ? "info-open" : ""} ${mobileChatOpen ? "mobile-chat-open" : ""}`}>
@@ -988,17 +991,15 @@ export function App() {
           <button
             className="current-profile"
             type="button"
-            title="Open my profile"
+            title="Open people"
             onClick={() => openTab("profile")}
           >
-            <span className="profile-mini-avatar">
-              {profile?.avatarPath
-                ? <img src={profile.avatarPath} alt="" />
-                : (profile?.displayName || "J").slice(0, 1).toUpperCase()}
+            <span className="stafi-logo-mark" aria-hidden="true">
+              <Layers size={22} />
             </span>
             <span>
               <strong>{tabLabel}</strong>
-              <small>{demoMode ? "Demo mode" : `@${profile?.username}`}</small>
+              <small>{demoMode ? "Demo mode" : "STAFI"}</small>
             </span>
           </button>
           <span className="brand-actions">
@@ -1019,7 +1020,7 @@ export function App() {
           <>
             {!searchOpen && (
               <>
-                <div className="chat-filter-pills" aria-label="Chat filters">
+                <div className="chat-filter-pills stafi-segments" aria-label="Chat filters">
                   {([
                     ["all", "All"],
                     ["direct", "Chats"],
@@ -1069,6 +1070,9 @@ export function App() {
               onCreateGroup={createGroup}
               fallbackPeople={demoMode ? demoPeople : noPeople}
             />
+            <button className="compose-fab" type="button" title="New chat" onClick={toggleSearch}>
+              <PenLine size={24} />
+            </button>
           </>
         )}
         {activeTab === "ai" && (
@@ -1109,21 +1113,19 @@ export function App() {
         <nav className="app-tab-bar" aria-label="Primary">
           <button className={activeTab === "chats" ? "active" : ""} type="button" onClick={() => openTab("chats")}>
             <MessageCircle size={23} />
-            <span>Chat</span>
+            <span>Chats</span>
+          </button>
+          <button className={activeTab === "profile" ? "active" : ""} type="button" onClick={() => openTab("profile")}>
+            <Users size={23} />
+            <span>People</span>
           </button>
           <button className={activeTab === "ai" ? "active" : ""} type="button" onClick={() => openTab("ai")}>
             <Bot size={23} />
-            <span>AI</span>
+            <span>Assistant</span>
           </button>
           <button className={activeTab === "settings" ? "active" : ""} type="button" onClick={() => openTab("settings")}>
             <Settings size={23} />
-            <span>Setting</span>
-          </button>
-          <button className={activeTab === "profile" ? "active" : ""} type="button" onClick={() => openTab("profile")}>
-            {profile.avatarPath
-              ? <img src={profile.avatarPath} alt="" />
-              : <UserRound size={23} />}
-            <span>Profile</span>
+            <span>Settings</span>
           </button>
         </nav>
       </aside>
