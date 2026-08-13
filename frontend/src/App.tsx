@@ -1,16 +1,23 @@
-﻿import { Client } from "@stomp/stompjs";
+import { Client } from "@stomp/stompjs";
 import {
   Bell,
+  BarChart3,
   Bot,
   ChevronRight,
+  Code2,
+  FileText,
+  Image as ImageIcon,
+  Languages,
   LogOut,
   Menu,
   MessageCircle,
+  MessageSquareText,
   Mic,
   Moon,
   Palette,
   PenLine,
   Search,
+  SearchCheck,
   Send,
   Settings,
   ShieldCheck,
@@ -1256,14 +1263,74 @@ function AiTab({
     recognition.start();
   }
 
+  const aiTools = [
+    {
+      title: "Smart Translation",
+      copy: "Real-time, context-aware translation across chats.",
+      meta: "v2.4 Stable",
+      icon: <Languages size={22} />
+    },
+    {
+      title: "Tone Changer",
+      copy: "Rewrite replies to sound professional, casual, kind, or persuasive.",
+      meta: "STAFI-NLP",
+      icon: <MessageSquareText size={22} />
+    },
+    {
+      title: "Code Assistant",
+      copy: "Debug, refactor, and generate clean snippets while you chat.",
+      meta: "Python / TS / Java",
+      icon: <Code2 size={22} />
+    },
+    {
+      title: "Image Helper",
+      copy: "Brainstorm captions, prompts, and visual ideas for posts.",
+      meta: "Creative mode",
+      icon: <ImageIcon size={22} />
+    },
+    {
+      title: "Meeting Summarizer",
+      copy: "Turn long chats and voice notes into clear action points.",
+      meta: "Audio enabled",
+      icon: <FileText size={22} />
+    },
+    {
+      title: "Data Analyst",
+      copy: "Ask questions about lists, notes, and structured text.",
+      meta: "Insight mode",
+      icon: <BarChart3 size={22} />
+    },
+    {
+      title: "Search Optimizer",
+      copy: "Improve prompts and searches with better wording.",
+      meta: "Web-ready",
+      icon: <SearchCheck size={22} />
+    },
+    {
+      title: "Mood Matcher",
+      copy: "Read conversation tone and suggest the best response style.",
+      meta: "New Beta",
+      icon: <Sparkles size={22} />
+    }
+  ];
   return (
     <section className="tab-page ai-tab" aria-label="AI">
       <div className="glass-hero">
         <span><Sparkles size={25} /></span>
-        <h2>AI assistant</h2>
+        <h2>AI Tools & Plugins</h2>
         <p>Summaries, questions, private conversation, and voice assistance stay close to your chats.</p>
       </div>
-      <div className="quick-actions">
+      <div className="ai-tool-grid" aria-label="AI tools">
+        {aiTools.map((tool, index) => (
+          <article className={index === 3 ? "ai-tool-card tall" : "ai-tool-card"} key={tool.title}>
+            <span className="ai-tool-icon">{tool.icon}</span>
+            <strong>{tool.title}</strong>
+            <p>{tool.copy}</p>
+            <small>{tool.meta}</small>
+          </article>
+        ))}
+      </div>
+      <div className="quick-actions ai-quick-actions">
         <button type="button" onClick={onSummarize}>
           <Bot size={18} />
           <span>
