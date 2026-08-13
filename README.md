@@ -1,11 +1,11 @@
-# Java Chat App
+﻿# Java Chat App
 
 Messenger-style web chat MVP with a Java Spring Boot backend, React frontend, Supabase
 Auth/Postgres/Storage, stories, voice messages, themes, and an AI assistant.
 
 ## Included
 
-- Gmail OAuth and phone OTP login through Supabase
+- Google OAuth and email/password login through Supabase
 - First-login profile setup with display names, usernames, bios, and avatars
 - Account search, contact requests, friend profiles, reusable direct chats, and groups
 - Local demo mode when Supabase keys are not configured
@@ -92,7 +92,7 @@ Run `supabase/schema.sql` in the Supabase SQL editor, then create three private 
 - `stories`
 - `chat-files`
 
-The schema creates a profile for each OAuth/phone user and enables row-level security. Review
+The schema creates a profile for each OAuth/email user and enables row-level security. Review
 `supabase/storage.md` before deploying. Missing storage buckets are created automatically by the
 backend on first upload.
 
@@ -101,6 +101,7 @@ message reaction, story reaction, reply, and delete-for-me structures without dr
 profile or conversation data. The latest message deletion migration is
 `supabase/migrations/20260801222500_message_delete_for_me.sql`, and the media
 message and AI action migration is `supabase/migrations/20260808200000_media_messages_and_ai_actions.sql`.
+
 
 ## Configure AI
 
@@ -133,3 +134,4 @@ If the configured model is overloaded or unavailable, the backend automatically 
 - Keep `SUPABASE_SECRET_KEY` on the Java server. Never expose it through a `VITE_` value.
 - Set `GROQ_SUMMARIZE_API_KEY`, `GROQ_VOICE_API_KEY`, and `GROQ_CONVERSATION_API_KEY` on the Java server for real hosted AI responses.
 - Pass only messages the authenticated user is authorized to read into AI requests.
+

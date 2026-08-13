@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, Eye, KeyRound, Mail, Phone, ShieldCheck, Sparkles, Zap } from "lucide-react";
+﻿import { ArrowLeft, ArrowRight, Eye, KeyRound, Mail, ShieldCheck, Sparkles, Zap } from "lucide-react";
 import { useState } from "react";
 import { supabase } from "../lib/supabase";
 
@@ -7,9 +7,9 @@ type AuthMode = "sign-in" | "sign-up";
 export function Login() {
   const [authMode, setAuthMode] = useState<AuthMode>("sign-in");
   const [showAuth, setShowAuth] = useState(false);
-  const [phone, setPhone] = useState("");
-  const [otp, setOtp] = useState("");
-  const [codeSent, setCodeSent] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
 
@@ -33,57 +33,57 @@ export function Login() {
 
   function changeAuthMode(mode: AuthMode) {
     setAuthMode(mode);
-    setCodeSent(false);
-    setOtp("");
     setStatus("");
   }
 
-  async function sendPhoneCode(event: React.FormEvent) {
+  async function submitCredentials(event: React.FormEvent) {
     event.preventDefault();
-    const normalizedPhone = phone.trim();
-
-    if (!normalizedPhone.startsWith("+")) {
-      setStatus("Enter your phone number with the country code, for example +959...");
+    const normalizedEmail = email.trim();
+    if (!normalizedEmail || !password) {
+      setStatus("Enter your email and password.");
+      return;
+    }
+    if (password.length < 6) {
+      setStatus("Password must be at least 6 characters.");
       return;
     }
 
     setBusy(true);
     setStatus("");
-    const { error } = await supabase.auth.signInWithOtp({
-      phone: normalizedPhone,
-      options: {
-        shouldCreateUser: authMode === "sign-up"
-      }
-    });
+    const { error } = authMode === "sign-up"
+      ? await supabase.auth.signUp({
+        email: normalizedEmail,
+        password,
+        options: { emailRedirectTo: window.location.origin }
+      })
+      : await supabase.auth.signInWithPassword({
+        email: normalizedEmail,
+        password
+      });
     setBusy(false);
 
     if (error) {
       setStatus(error.message);
       return;
     }
-
-    setCodeSent(true);
-    setStatus("Code sent. Enter the SMS code below.");
+    if (authMode === "sign-up") {
+      setStatus("Account created. Check your email if confirmation is required.");
+    }
   }
 
-  async function verifyPhoneCode(event: React.FormEvent) {
-    event.preventDefault();
-
-    if (!/^\d{6}$/.test(otp)) {
-      setStatus("Enter the 6-digit code from the SMS.");
+  async function resetPassword() {
+    const normalizedEmail = email.trim();
+    if (!normalizedEmail) {
+      setStatus("Enter your email address first.");
       return;
     }
-
     setBusy(true);
     setStatus("");
-    const { error } = await supabase.auth.verifyOtp({
-      phone: phone.trim(),
-      token: otp,
-      type: "sms"
+    const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
+      redirectTo: window.location.origin
     });
     setBusy(false);
-
-    if (error) setStatus(error.message);
+    setStatus(error ? error.message : "Password reset link sent to your email.");
   }
 
   return (
@@ -138,8 +138,8 @@ export function Login() {
             <span className="stafi-logo-mark image-mark"><img src="/stafi-logo.jpg" alt="" /></span>
             <strong>STAFI</strong>
           </span>
-          <h1>Welcome back</h1>
-          <p>Continue your journey with STAFI</p>
+          <h1>{authMode === "sign-up" ? "Create account" : "Welcome back"}</h1>
+          <p>{authMode === "sign-up" ? "Create your STAFI account with email" : "Continue with email or Google"}</p>
         </div>
         <div className="auth-mode" aria-label="Authentication mode">
           <button
@@ -157,71 +157,50 @@ export function Login() {
             Sign up
           </button>
         </div>
-        <form className="phone-form" onSubmit={codeSent ? verifyPhoneCode : sendPhoneCode}>
-          <label>
-            Email address
-            <div className="phone-input">
+        <form className="auth-form" onSubmit={submitCredentials}>
+          <label className="auth-field">
+            <span>Email address</span>
+            <div className="auth-input">
               <Mail size={18} aria-hidden="true" />
-              <input placeholder="Email address" type="email" disabled={busy} />
-            </div>
-          </label>
-          <div className="auth-divider"><span>or</span></div>
-          <label>
-            Phone number
-            <div className="phone-input">
-              <Phone size={18} aria-hidden="true" />
               <input
-                value={phone}
-                onChange={(event) => {
-                  setPhone(event.target.value);
-                  if (codeSent) {
-                    setCodeSent(false);
-                    setOtp("");
-                  }
-                }}
-                placeholder="+959..."
-                inputMode="tel"
-                autoComplete="tel"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="Email address"
+                type="email"
+                autoComplete="email"
                 disabled={busy}
               />
             </div>
           </label>
-          <div className="auth-divider"><span>and</span></div>
-          {codeSent && (
-            <label>
-              SMS code
-              <div className="phone-input">
-                <KeyRound size={18} aria-hidden="true" />
-                <input
-                  value={otp}
-                  onChange={(event) => setOtp(event.target.value.replace(/\D/g, "").slice(0, 6))}
-                  placeholder="6-digit code"
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  disabled={busy}
-                />
-              </div>
-            </label>
-          )}
-          {!codeSent && (
-            <label>
-              Password
-              <div className="phone-input">
-                <KeyRound size={18} aria-hidden="true" />
-                <input placeholder="Password" type="password" disabled />
+          <label className="auth-field">
+            <span>Password</span>
+            <div className="auth-input">
+              <KeyRound size={18} aria-hidden="true" />
+              <input
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="Password"
+                type={showPassword ? "text" : "password"}
+                autoComplete={authMode === "sign-up" ? "new-password" : "current-password"}
+                disabled={busy}
+              />
+              <button
+                className="password-toggle"
+                type="button"
+                title={showPassword ? "Hide password" : "Show password"}
+                onClick={() => setShowPassword((current) => !current)}
+                disabled={busy}
+              >
                 <Eye size={18} aria-hidden="true" />
-              </div>
-            </label>
-          )}
-          <button className="forgot-link" type="button" disabled>Forgot Password?</button>
-          <button className="primary-button" type="submit" disabled={busy}>
-            {busy ? "Please wait..." : codeSent ? "Verify & continue" : "Sign In"} <ArrowRight size={19} />
+              </button>
+            </div>
+          </label>
+          <button className="forgot-link" type="button" onClick={resetPassword} disabled={busy}>
+            Forgot Password?
           </button>
-          {codeSent && (
-            <button className="text-button" type="button" onClick={sendPhoneCode} disabled={busy}>
-              Send code again
-            </button>
-          )}
+          <button className="primary-button" type="submit" disabled={busy}>
+            {busy ? "Please wait..." : authMode === "sign-up" ? "Create Account" : "Sign In"} <ArrowRight size={19} />
+          </button>
         </form>
         <div className="auth-divider connect-divider"><span>or connect with</span></div>
         <button className="google-button" type="button" onClick={loginWithGoogle} disabled={busy}>
@@ -230,7 +209,13 @@ export function Login() {
         </button>
         {status && <p className="status" role="status">{status}</p>}
         <p className="create-account-copy">
-          Don't have an account? <button type="button" onClick={() => changeAuthMode("sign-up")}>Create Account</button>
+          {authMode === "sign-up" ? "Already have an account?" : "Don't have an account?"}{" "}
+          <button
+            type="button"
+            onClick={() => changeAuthMode(authMode === "sign-up" ? "sign-in" : "sign-up")}
+          >
+            {authMode === "sign-up" ? "Log In" : "Create Account"}
+          </button>
         </p>
       </section>
       )}

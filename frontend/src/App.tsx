@@ -1114,19 +1114,19 @@ export function App() {
         <nav className="app-tab-bar" aria-label="Primary">
           <button className={activeTab === "chats" ? "active" : ""} type="button" onClick={() => openTab("chats")}>
             <MessageCircle size={23} />
-            <span>Chats</span>
+            <span>Chat</span>
+          </button>
+          <button className={activeTab === "ai" ? "active" : ""} type="button" onClick={() => openTab("ai")}>
+            <img className="tab-logo" src="/stafi-logo.jpg" alt="" />
+            <span>Assistance</span>
           </button>
           <button className={activeTab === "profile" ? "active" : ""} type="button" onClick={() => openTab("profile")}>
             <Users size={23} />
             <span>People</span>
           </button>
-          <button className={activeTab === "ai" ? "active" : ""} type="button" onClick={() => openTab("ai")}>
-            <img className="tab-logo" src="/stafi-logo.jpg" alt="" />
-            <span>Assistant</span>
-          </button>
           <button className={activeTab === "settings" ? "active" : ""} type="button" onClick={() => openTab("settings")}>
             <Settings size={23} />
-            <span>Settings</span>
+            <span>Setting</span>
           </button>
         </nav>
       </aside>
