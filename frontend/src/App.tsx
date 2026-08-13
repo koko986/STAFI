@@ -3,7 +3,6 @@ import {
   Bell,
   Bot,
   ChevronRight,
-  Layers,
   LogOut,
   Menu,
   MessageCircle,
@@ -996,8 +995,8 @@ export function App() {
             title="Open people"
             onClick={() => openTab("profile")}
           >
-            <span className="stafi-logo-mark" aria-hidden="true">
-              <Layers size={22} />
+            <span className="stafi-logo-mark image-mark" aria-hidden="true">
+              <img src="/stafi-logo.jpg" alt="" />
             </span>
             <span>
               <strong>{tabLabel}</strong>
@@ -1122,7 +1121,7 @@ export function App() {
             <span>People</span>
           </button>
           <button className={activeTab === "ai" ? "active" : ""} type="button" onClick={() => openTab("ai")}>
-            <Bot size={23} />
+            <img className="tab-logo" src="/stafi-logo.jpg" alt="" />
             <span>Assistant</span>
           </button>
           <button className={activeTab === "settings" ? "active" : ""} type="button" onClick={() => openTab("settings")}>

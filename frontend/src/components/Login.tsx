@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, Eye, KeyRound, Layers, Mail, Phone, ShieldCheck, Sparkles, Zap } from "lucide-react";
+import { ArrowLeft, ArrowRight, Eye, KeyRound, Mail, Phone, ShieldCheck, Sparkles, Zap } from "lucide-react";
 import { useState } from "react";
 import { supabase } from "../lib/supabase";
 
@@ -92,7 +92,7 @@ export function Login() {
         <section className="stafi-landing">
           <header className="stafi-auth-header">
             <span className="stafi-brand">
-              <span className="stafi-logo-mark"><Layers size={21} /></span>
+              <span className="stafi-logo-mark image-mark"><img src="/stafi-logo.jpg" alt="" /></span>
               <strong>STAFI</strong>
             </span>
             <button className="help-link" type="button">Help Center</button>
@@ -135,7 +135,7 @@ export function Login() {
         </button>
         <div className="login-brand-lockup">
           <span className="stafi-brand">
-            <span className="stafi-logo-mark"><Layers size={21} /></span>
+            <span className="stafi-logo-mark image-mark"><img src="/stafi-logo.jpg" alt="" /></span>
             <strong>STAFI</strong>
           </span>
           <h1>Welcome back</h1>

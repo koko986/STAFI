@@ -1,0 +1,772 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&family=Sora:wght@600;700;800;900&display=swap");
+
+:root {
+  --stafi-bg: #fbf9f8;
+  --stafi-surface: #fbf9f8;
+  --stafi-surface-low: #f5f3f3;
+  --stafi-surface-high: #e9e8e7;
+  --stafi-card: #ffffff;
+  --stafi-primary: #984800;
+  --stafi-primary-container: #e77412;
+  --stafi-primary-fixed: #ffdbc7;
+  --stafi-primary-soft: #ffb689;
+  --stafi-secondary: #6a5c4a;
+  --stafi-secondary-container: #f3e0c9;
+  --stafi-outline: #8a7264;
+  --stafi-outline-variant: #dec1b1;
+  --stafi-ink: #1b1c1c;
+  --stafi-muted: #574236;
+  --stafi-shadow: 0 18px 42px rgba(76, 33, 0, 0.1);
+  color: var(--stafi-ink);
+  background: var(--stafi-bg);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+body,
+button,
+input,
+textarea,
+select {
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+h1,
+h2,
+h3,
+.current-profile strong,
+.conversation-copy strong,
+.login-brand-lockup h1,
+.landing-feature-list article strong,
+.stafi-brand strong {
+  font-family: Sora, Inter, sans-serif;
+}
+
+.section-label,
+.app-tab-bar button span,
+.hero-pill,
+.auth-divider,
+.help-link {
+  font-family: "JetBrains Mono", Inter, monospace;
+}
+
+.app,
+.app.dark {
+  --app-ink: var(--stafi-ink);
+  --app-muted: var(--stafi-muted);
+  --glass-bg: rgba(255, 255, 255, 0.82);
+  --glass-strong: rgba(255, 255, 255, 0.88);
+  --glass-border: rgba(222, 193, 177, 0.72);
+  background: var(--stafi-bg);
+}
+
+.sidebar,
+.chat-window,
+.user-info-panel,
+.tab-page,
+.glass-hero,
+.glass-list,
+.profile-card-glass,
+.ai-assistant-panel,
+.settings-section,
+.profile-details,
+.story-composer,
+.group-modal,
+.message-actions,
+.forward-panel {
+  border-color: rgba(222, 193, 177, 0.55);
+  color: var(--stafi-ink);
+  background: var(--stafi-surface);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.sidebar {
+  background: var(--stafi-bg);
+}
+
+.brand {
+  min-height: 62px;
+  border-bottom: 1px solid rgba(222, 193, 177, 0.25);
+}
+
+.current-profile {
+  gap: 12px;
+  color: var(--stafi-ink);
+}
+
+.current-profile strong {
+  color: var(--stafi-primary);
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.current-profile small {
+  color: var(--stafi-muted);
+}
+
+.stafi-logo-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  overflow: hidden;
+  border-radius: 10px;
+  background: transparent;
+  box-shadow: none;
+}
+
+.stafi-logo-mark.image-mark img,
+.tab-logo {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.tab-logo {
+  width: 24px;
+  height: 24px;
+  filter: saturate(1.08);
+}
+
+.brand-actions button,
+.header-actions button,
+.mobile-back {
+  color: var(--stafi-muted);
+  background: transparent;
+}
+
+.brand-actions button:hover,
+.brand-actions button.active,
+.header-actions button:hover,
+.mobile-back:hover {
+  color: var(--stafi-primary);
+  background: var(--stafi-secondary-container);
+}
+
+.chat-filter-pills.stafi-segments {
+  height: 46px;
+  border: 1px solid rgba(222, 193, 177, 0.72);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.chat-filter-pills button {
+  color: var(--stafi-muted);
+  font-weight: 800;
+}
+
+.chat-filter-pills button.active {
+  color: #fff;
+  background: var(--stafi-primary-container);
+  box-shadow: 0 10px 24px rgba(231, 116, 18, 0.22);
+}
+
+.stories {
+  border-bottom: 1px solid rgba(222, 193, 177, 0.22);
+  background: var(--stafi-surface);
+}
+
+.story-thumb,
+.add-story-thumb {
+  border-color: var(--stafi-primary);
+  background: var(--stafi-secondary-container);
+}
+
+.story label,
+.story small {
+  color: var(--stafi-muted);
+}
+
+.chat-search {
+  min-height: 72px;
+  border: 1px solid rgba(222, 193, 177, 0.72);
+  border-radius: 12px;
+  color: var(--stafi-ink);
+  background: var(--stafi-card);
+}
+
+.chat-search input {
+  color: var(--stafi-ink);
+  font-family: "JetBrains Mono", Inter, monospace;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.chat-search input::placeholder {
+  color: var(--stafi-ink);
+}
+
+.new-group-button,
+.compose-fab,
+.primary-button {
+  color: #311300;
+  background: var(--stafi-primary-container);
+  box-shadow: 0 12px 28px rgba(231, 116, 18, 0.2);
+}
+
+.compose-fab {
+  border-radius: 12px;
+}
+
+.section-label {
+  color: var(--stafi-outline);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.conversation {
+  border-bottom: 1px solid rgba(222, 193, 177, 0.18);
+  color: var(--stafi-ink);
+  background: transparent;
+}
+
+.conversation:hover,
+.conversation.active {
+  background: var(--stafi-surface-low);
+}
+
+.conversation.unread {
+  background: linear-gradient(90deg, rgba(255, 219, 199, 0.62), transparent 76%);
+}
+
+.conversation .avatar,
+.person-main .avatar,
+.contact-row .avatar,
+.member-option .avatar,
+.chat-identity .avatar,
+.profile-mini-avatar,
+.user-info-avatar,
+.profile-avatar-preview {
+  border-radius: 50%;
+  color: var(--stafi-primary);
+  background: var(--stafi-secondary-container);
+}
+
+.conversation-copy strong,
+.person-main strong,
+.contact-main strong,
+.contact-row strong {
+  color: var(--stafi-ink);
+  font-weight: 800;
+}
+
+.conversation-copy small,
+.presence-line,
+.person-main small,
+.contact-main small,
+.contact-row small {
+  color: var(--stafi-outline);
+}
+
+.conversation.unread .conversation-copy strong,
+.conversation.unread .message-preview {
+  color: var(--stafi-ink);
+  font-weight: 900;
+}
+
+.unread-badge {
+  color: #fff;
+  background: var(--stafi-primary-container);
+}
+
+.app-tab-bar {
+  border: 1px solid rgba(222, 193, 177, 0.42);
+  background: rgba(251, 249, 248, 0.9);
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.04);
+  backdrop-filter: blur(16px);
+}
+
+.app-tab-bar button {
+  color: var(--stafi-muted);
+  border-radius: 12px;
+  font-weight: 800;
+}
+
+.app-tab-bar button.active {
+  color: #311300;
+  background: var(--stafi-primary-container);
+  box-shadow: 0 10px 22px rgba(231, 116, 18, 0.18);
+}
+
+.app-tab-bar button.active .tab-logo {
+  filter: none;
+}
+
+.app-tab-bar button:not(.active) .tab-logo {
+  filter: grayscale(1) brightness(0.45);
+}
+
+.chat-header,
+.composer {
+  border-color: rgba(222, 193, 177, 0.3);
+  background: rgba(251, 249, 248, 0.9);
+  backdrop-filter: blur(18px);
+}
+
+.bubble.mine {
+  color: #fff;
+  background: var(--stafi-primary-container);
+}
+
+.bubble.theirs,
+.bubble.ai {
+  color: var(--stafi-ink);
+  background: var(--stafi-secondary-container);
+}
+
+.composer input,
+.phone-input,
+.profile-form input,
+.profile-form textarea,
+.profile-details-form input,
+.profile-details-form textarea,
+.username-input {
+  border-color: rgba(222, 193, 177, 0.7);
+  color: var(--stafi-ink);
+  background: var(--stafi-card);
+}
+
+.login-shell {
+  color: var(--stafi-ink);
+  background: linear-gradient(180deg, var(--stafi-secondary-container), var(--stafi-bg) 46%, var(--stafi-secondary-container));
+}
+
+.stafi-landing,
+.login-panel {
+  width: min(100%, 430px);
+}
+
+.stafi-auth-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  min-height: 48px;
+  background: rgba(243, 224, 201, 0.78);
+  backdrop-filter: blur(14px);
+}
+
+.stafi-brand {
+  color: var(--stafi-primary);
+}
+
+.help-link,
+.forgot-link,
+.create-account-copy button {
+  color: var(--stafi-primary);
+}
+
+.hero-pill {
+  color: var(--stafi-primary);
+  background: rgba(152, 72, 0, 0.08);
+  border-color: rgba(152, 72, 0, 0.18);
+}
+
+.stafi-hero-copy h1 {
+  color: #311300;
+  font-weight: 900;
+}
+
+.stafi-hero-copy h1 span {
+  color: var(--stafi-primary-container);
+}
+
+.stafi-hero-copy p:not(.hero-pill),
+.landing-feature-list article p,
+.login-brand-lockup p,
+.create-account-copy {
+  color: var(--stafi-muted);
+}
+
+.landing-feature-list article,
+.login-panel {
+  border: 1px solid rgba(222, 193, 177, 0.72);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: var(--stafi-shadow);
+  backdrop-filter: blur(20px);
+}
+
+.landing-feature-list article span {
+  color: var(--stafi-ink);
+  background: var(--stafi-secondary-container);
+}
+
+.landing-feature-list article:hover span {
+  color: #fff;
+  background: var(--stafi-primary-container);
+}
+
+.secondary-button,
+.google-button,
+.auth-back {
+  border-color: rgba(222, 193, 177, 0.6);
+  color: var(--stafi-ink);
+  background: #fff;
+}
+
+.auth-mode {
+  border-color: rgba(222, 193, 177, 0.62);
+  background: var(--stafi-surface-low);
+}
+
+.auth-mode button.active {
+  color: #311300;
+  background: var(--stafi-primary-container);
+}
+
+.auth-divider {
+  color: var(--stafi-muted);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  background: rgba(222, 193, 177, 0.45);
+}
+
+@media (min-width: 821px) {
+  .app {
+    grid-template-columns: minmax(320px, 390px) minmax(0, 1fr);
+    gap: 0;
+    padding: 0;
+  }
+
+  .app.info-open {
+    grid-template-columns: minmax(320px, 390px) minmax(420px, 1fr) 380px;
+  }
+
+  .sidebar,
+  .chat-window,
+  .user-info-panel {
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .sidebar {
+    border-right: 1px solid rgba(222, 193, 177, 0.32);
+  }
+}
+
+@media (max-width: 820px) {
+  body {
+    background: var(--stafi-bg);
+  }
+
+  .app,
+  .app.dark {
+    background: var(--stafi-bg);
+  }
+
+  .sidebar {
+    background: var(--stafi-bg);
+  }
+
+  .chat-filter-pills,
+  .chat-search,
+  .app-tab-bar,
+  .glass-list,
+  .glass-hero,
+  .profile-card-glass,
+  .quick-actions button {
+    background: rgba(251, 249, 248, 0.92);
+  }
+
+  .app-tab-bar {
+    height: 68px;
+  }
+}
+
+body:has(.login-shell) {
+  min-height: 100dvh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: linear-gradient(180deg, var(--stafi-secondary-container), var(--stafi-bg) 46%, var(--stafi-secondary-container));
+}
+
+#root:has(.login-shell) {
+  min-height: 100dvh;
+  height: auto;
+}
+
+.login-shell {
+  display: block;
+  width: 100%;
+  min-height: 100dvh;
+  height: auto;
+  overflow: visible;
+  padding: 0;
+}
+
+.stafi-landing {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: 16px 18px 32px;
+}
+
+.login-panel {
+  display: grid;
+  gap: 16px;
+  min-height: auto;
+  margin: 24px auto 36px;
+  padding: 34px 28px;
+}
+
+.stafi-hero-copy {
+  flex: 0 0 auto;
+  padding: clamp(38px, 11vh, 84px) 14px 22px;
+}
+
+.stafi-hero-copy h1 {
+  font-size: clamp(32px, 9.8vw, 42px);
+  line-height: 1.12;
+}
+
+.landing-actions {
+  flex: 0 0 auto;
+}
+
+.landing-feature-list {
+  flex: 0 0 auto;
+  padding-bottom: 12px;
+}
+
+.phone-form {
+  min-width: 0;
+}
+
+.phone-input {
+  min-width: 0;
+}
+
+.phone-input input {
+  min-width: 0;
+}
+
+@media (min-width: 760px) {
+  .stafi-landing {
+    width: min(100%, 960px);
+    padding-right: 32px;
+    padding-left: 32px;
+  }
+
+  .stafi-hero-copy {
+    max-width: 680px;
+    padding-top: 80px;
+  }
+
+  .stafi-hero-copy h1 {
+    max-width: 640px;
+    font-size: clamp(42px, 7vw, 64px);
+    line-height: 1.08;
+  }
+
+  .stafi-hero-copy p:not(.hero-pill) {
+    max-width: 520px;
+  }
+
+  .landing-actions {
+    align-items: flex-start;
+    flex-direction: row;
+    padding-left: 14px;
+  }
+
+  .landing-actions .primary-button,
+  .landing-actions .secondary-button {
+    width: min(260px, 100%);
+  }
+
+  .landing-feature-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin-top: 18px;
+  }
+}
+
+@media (max-width: 430px) {
+  .stafi-landing {
+    padding: 14px 16px 28px;
+  }
+
+  .stafi-auth-header {
+    min-height: 42px;
+  }
+
+  .stafi-logo-mark {
+    width: 34px;
+    height: 34px;
+  }
+
+  .stafi-hero-copy {
+    padding: 34px 4px 18px;
+  }
+
+  .hero-pill {
+    max-width: 100%;
+    padding: 8px 12px;
+    font-size: 10px;
+    white-space: normal;
+  }
+
+  .stafi-hero-copy h1 {
+    margin: 22px 0 18px;
+    font-size: clamp(30px, 10vw, 38px);
+  }
+
+  .landing-actions {
+    padding: 0 0 28px;
+  }
+
+  .landing-feature-list article {
+    padding: 18px;
+  }
+
+  .login-panel {
+    width: calc(100% - 24px);
+    margin-top: 16px;
+    margin-bottom: 28px;
+    padding: 78px 18px 24px;
+    border-radius: 22px;
+  }
+
+  .login-brand-lockup h1 {
+    margin-top: 10px;
+    font-size: 26px;
+  }
+
+  .auth-back {
+    top: 16px;
+    left: 16px;
+  }
+
+  .phone-input {
+    min-height: 56px;
+  }
+}
+
+/* Phone auth hardening: the main app locks body scrolling, so auth owns its own scroll area. */
+.login-shell {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100dvh;
+  min-height: 100dvh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.stafi-landing {
+  min-height: auto;
+}
+
+.login-panel {
+  max-width: calc(100% - 24px);
+}
+
+@supports not (height: 100dvh) {
+  .login-shell {
+    height: 100vh;
+    min-height: 100vh;
+  }
+}
+
+@media (max-width: 560px) {
+  .login-shell {
+    padding: 0;
+  }
+
+  .stafi-landing {
+    width: 100%;
+    padding: 12px 16px 28px;
+  }
+
+  .stafi-auth-header {
+    position: relative;
+    top: auto;
+    margin-bottom: 4px;
+    padding: 0;
+    background: transparent;
+    backdrop-filter: none;
+  }
+
+  .stafi-brand {
+    gap: 8px;
+  }
+
+  .stafi-hero-copy {
+    padding: 28px 0 18px;
+  }
+
+  .hero-pill {
+    width: fit-content;
+    max-width: 100%;
+    padding: 8px 12px;
+    font-size: 10px;
+    line-height: 1.35;
+  }
+
+  .stafi-hero-copy h1 {
+    max-width: 100%;
+    margin: 18px 0 16px;
+    font-size: clamp(30px, 10.2vw, 40px);
+    line-height: 1.12;
+  }
+
+  .stafi-hero-copy p:not(.hero-pill) {
+    max-width: 100%;
+    font-size: 15px;
+    line-height: 1.45;
+  }
+
+  .landing-actions {
+    gap: 12px;
+    padding: 0 0 22px;
+  }
+
+  .landing-actions .primary-button,
+  .landing-actions .secondary-button {
+    width: 100%;
+    min-height: 54px;
+  }
+
+  .landing-feature-list {
+    gap: 12px;
+    padding-bottom: 22px;
+  }
+
+  .landing-feature-list article {
+    padding: 16px;
+    border-radius: 18px;
+  }
+
+  .landing-feature-list article span {
+    width: 38px;
+    height: 38px;
+    margin-bottom: 12px;
+  }
+
+  .landing-feature-list article strong {
+    margin-bottom: 6px;
+    font-size: 16px;
+  }
+
+  .landing-feature-list article p {
+    font-size: 14px;
+    line-height: 1.36;
+  }
+
+  .login-panel {
+    width: calc(100% - 24px);
+    margin: 12px auto 28px;
+    padding: 74px 18px 22px;
+  }
+}
