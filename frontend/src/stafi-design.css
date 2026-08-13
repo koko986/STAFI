@@ -3080,3 +3080,13 @@ body:has(.login-shell) {
 .messages {
   position: relative;
 }
+
+/* Assistance tab: keep Ask AI at the top */
+.ai-tab > .glass-hero + .ai-assistant-panel {
+  margin-top: 0;
+}
+
+.ai-tab > .ai-assistant-panel + .ai-tool-grid,
+.ai-tab > .ai-assistant-panel + .ai-tool-grid + .ai-quick-actions {
+  margin-top: 0;
+}

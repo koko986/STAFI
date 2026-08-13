@@ -1320,32 +1320,6 @@ function AiTab({
         <h2>AI Tools & Plugins</h2>
         <p>Summaries, questions, private conversation, and voice assistance stay close to your chats.</p>
       </div>
-      <div className="ai-tool-grid" aria-label="AI tools">
-        {aiTools.map((tool, index) => (
-          <article className={index === 3 ? "ai-tool-card tall" : "ai-tool-card"} key={tool.title}>
-            <span className="ai-tool-icon">{tool.icon}</span>
-            <strong>{tool.title}</strong>
-            <p>{tool.copy}</p>
-            <small>{tool.meta}</small>
-          </article>
-        ))}
-      </div>
-      <div className="quick-actions ai-quick-actions">
-        <button type="button" onClick={onSummarize}>
-          <Bot size={18} />
-          <span>
-            <strong>Summarize active chat</strong>
-            <small>Catch up fast</small>
-          </span>
-        </button>
-        <button type="button" onClick={onDraft}>
-          <Sparkles size={18} />
-          <span>
-            <strong>Draft reply</strong>
-            <small>Get a polished suggestion</small>
-          </span>
-        </button>
-      </div>
       <form
         className="ai-assistant-panel"
         onSubmit={(event) => {
@@ -1394,6 +1368,32 @@ function AiTab({
         </div>
         {status && <p className="ai-assistant-status" role="status">{status}</p>}
       </form>
+      <div className="ai-tool-grid" aria-label="AI tools">
+        {aiTools.map((tool, index) => (
+          <article className={index === 3 ? "ai-tool-card tall" : "ai-tool-card"} key={tool.title}>
+            <span className="ai-tool-icon">{tool.icon}</span>
+            <strong>{tool.title}</strong>
+            <p>{tool.copy}</p>
+            <small>{tool.meta}</small>
+          </article>
+        ))}
+      </div>
+      <div className="quick-actions ai-quick-actions">
+        <button type="button" onClick={onSummarize}>
+          <Bot size={18} />
+          <span>
+            <strong>Summarize active chat</strong>
+            <small>Catch up fast</small>
+          </span>
+        </button>
+        <button type="button" onClick={onDraft}>
+          <Sparkles size={18} />
+          <span>
+            <strong>Draft reply</strong>
+            <small>Get a polished suggestion</small>
+          </span>
+        </button>
+      </div>
       <div className="glass-list">
         <div className="section-label"><span>AI chats</span><small>{conversations.length}</small></div>
         {conversations.map((conversation) => (
