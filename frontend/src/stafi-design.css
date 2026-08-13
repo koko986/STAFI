@@ -2440,3 +2440,471 @@ body:has(.login-shell) {
     font-size: 9px;
   }
 }
+
+/* Search input should preserve typed usernames and names */
+.chat-search input,
+.app.dark .chat-search input {
+  text-transform: none;
+  letter-spacing: 0;
+  text-align: left;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-weight: 600;
+}
+
+.chat-search input::placeholder,
+.app.dark .chat-search input::placeholder {
+  text-transform: none;
+  letter-spacing: 0;
+  text-align: left;
+  font-weight: 500;
+}
+
+/* Demo message action, select, and report UI */
+.chat-selection-header {
+  position: sticky;
+  top: 0;
+  z-index: 34;
+  display: grid;
+  grid-template-columns: 44px 1fr auto;
+  align-items: center;
+  min-height: 70px;
+  padding: 10px 18px;
+  border-bottom: 1px solid rgba(222, 193, 177, 0.34);
+  color: var(--stafi-primary);
+  background: rgba(251, 249, 248, 0.9);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.app.dark .chat-selection-header {
+  background: rgba(29, 26, 24, 0.92);
+}
+
+.chat-selection-header button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+}
+
+.chat-selection-header strong,
+.chat-selection-header .select-all-button {
+  font-family: Sora, Inter, sans-serif;
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.chat-selection-header .select-all-button {
+  padding: 8px 0 8px 12px;
+}
+
+.chat-notice {
+  position: absolute;
+  top: 78px;
+  left: 50%;
+  z-index: 60;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border: 1px solid rgba(222, 193, 177, 0.55);
+  border-radius: 999px;
+  color: var(--stafi-primary);
+  background: var(--stafi-card-glass);
+  box-shadow: 0 12px 28px rgba(76, 33, 0, 0.12);
+  transform: translateX(-50%);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.chat-notice button {
+  display: inline-grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  color: inherit;
+  background: transparent;
+}
+
+.messages.selection-mode {
+  padding-left: 54px;
+}
+
+.bulk-select-dot {
+  position: absolute;
+  left: -40px;
+  top: 50%;
+  display: inline-grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  color: var(--stafi-primary-container);
+  background: transparent;
+  transform: translateY(-50%);
+}
+
+.bubble.bulk-selected {
+  outline: 2px solid rgba(231, 116, 18, 0.34);
+  outline-offset: 2px;
+}
+
+.pinned-context {
+  color: var(--stafi-primary);
+}
+
+.message-actions {
+  right: 0;
+  min-width: 198px;
+  padding: 0;
+  border: 0;
+  border-radius: 20px;
+  background: transparent;
+  box-shadow: none;
+}
+
+.reaction-picker {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 10px);
+  display: flex;
+  gap: 6px;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 14px 30px rgba(38, 22, 10, 0.18);
+}
+
+.reaction-picker button {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  font-size: 19px;
+}
+
+.message-command-row {
+  display: grid;
+  gap: 0;
+  padding: 12px 0;
+  overflow: hidden;
+  border: 1px solid rgba(222, 193, 177, 0.38);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 18px 44px rgba(38, 22, 10, 0.22);
+}
+
+.message-command-row button {
+  display: grid;
+  grid-template-columns: 1fr 24px;
+  min-height: 40px;
+  padding: 0 16px 0 18px;
+  border: 0;
+  border-radius: 0;
+  color: #1b1c1c;
+  background: transparent;
+  text-align: left;
+}
+
+.message-command-row button svg {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: center;
+  justify-self: end;
+}
+
+.message-command-row button span {
+  grid-column: 1;
+  grid-row: 1;
+  align-self: center;
+}
+
+.message-command-row button:hover {
+  background: rgba(243, 224, 201, 0.5);
+}
+
+.message-command-row button.danger {
+  color: #d31919;
+}
+
+.message-command-row .ask-stafi-action {
+  margin-top: 6px;
+  color: var(--stafi-primary-container);
+  font-weight: 900;
+}
+
+.app.dark .reaction-picker,
+.app.dark .message-command-row {
+  background: rgba(38, 33, 29, 0.98);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.38);
+}
+
+.app.dark .message-command-row button {
+  color: var(--stafi-ink);
+}
+
+.app.dark .message-command-row button.danger {
+  color: #ff7777;
+}
+
+.report-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(0, 0, 0, 0.36);
+}
+
+.report-sheet {
+  display: grid;
+  width: min(440px, 100%);
+  max-height: min(860px, calc(100dvh - 36px));
+  overflow-y: auto;
+  border-radius: 26px;
+  background: var(--stafi-card);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.26);
+}
+
+.report-sheet header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 28px 30px 18px;
+  border-bottom: 1px solid rgba(222, 193, 177, 0.28);
+}
+
+.report-sheet h2,
+.report-sheet p {
+  margin: 0;
+}
+
+.report-sheet h2 {
+  font-family: Sora, Inter, sans-serif;
+  font-size: 22px;
+}
+
+.report-sheet p {
+  margin-top: 6px;
+  color: var(--stafi-muted);
+}
+
+.report-sheet header button {
+  border: 0;
+  background: transparent;
+  color: var(--stafi-muted);
+}
+
+.report-option {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-height: 66px;
+  margin: 10px 30px 0;
+  padding: 0 18px;
+  border: 1px solid rgba(222, 193, 177, 0.72);
+  border-radius: 10px;
+  color: var(--stafi-ink);
+  background: rgba(245, 243, 243, 0.72);
+  text-align: left;
+}
+
+.report-option svg {
+  color: var(--stafi-outline);
+}
+
+.report-submit {
+  margin: 28px 30px 30px;
+  min-height: 70px;
+  border-radius: 12px;
+  color: #fff;
+  font-family: Sora, Inter, sans-serif;
+  font-size: 20px;
+  font-weight: 900;
+}
+
+.selection-toolbar {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 40;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  min-height: 86px;
+  padding: 12px 20px max(12px, env(safe-area-inset-bottom));
+  border-top: 1px solid rgba(222, 193, 177, 0.28);
+  background: rgba(251, 249, 248, 0.94);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.selection-toolbar button {
+  display: grid;
+  place-items: center;
+  gap: 4px;
+  border: 0;
+  color: var(--stafi-primary);
+  background: transparent;
+  font-family: "JetBrains Mono", Inter, monospace;
+  font-size: 12px;
+}
+
+.selection-toolbar button.danger {
+  color: #d31919;
+}
+
+.app.dark .selection-toolbar {
+  background: rgba(29, 26, 24, 0.94);
+}
+
+@media (max-width: 520px) {
+  .message-actions {
+    right: -4px;
+    min-width: 198px;
+  }
+
+  .bubble.theirs .message-actions,
+  .bubble.ai .message-actions {
+    right: auto;
+    left: 0;
+  }
+
+  .messages.selection-mode {
+    padding-left: 58px;
+  }
+}
+
+/* Fix message action usability: compact menu, real pin bar, clearer delete */
+.pinned-message-bar {
+  z-index: 28;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 36px;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-bottom: 1px solid rgba(222, 193, 177, 0.28);
+  background: rgba(255, 250, 245, 0.94);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.pinned-message-main {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  border: 0;
+  color: var(--stafi-primary);
+  background: transparent;
+  text-align: left;
+}
+
+.pinned-message-main span {
+  min-width: 0;
+}
+
+.pinned-message-main strong,
+.pinned-message-main small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pinned-message-main strong {
+  font-family: Sora, Inter, sans-serif;
+  font-size: 13px;
+}
+
+.pinned-message-main small {
+  color: var(--stafi-muted);
+  font-size: 12px;
+}
+
+.pinned-message-close {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  color: var(--stafi-muted);
+  background: transparent;
+}
+
+.pinned-message-close:hover {
+  color: var(--stafi-primary);
+  background: rgba(243, 224, 201, 0.7);
+}
+
+.message-actions {
+  z-index: 46;
+  min-width: 190px;
+  max-width: min(250px, 82vw);
+}
+
+.reaction-picker {
+  position: static;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+  margin: 0 0 6px;
+  padding: 8px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 10px 22px rgba(38, 22, 10, 0.14);
+}
+
+.reaction-picker button {
+  width: 30px;
+  height: 30px;
+  justify-self: center;
+}
+
+.message-command-row {
+  max-height: min(280px, 46dvh);
+  overflow-y: auto;
+  border-radius: 16px;
+  box-shadow: 0 14px 34px rgba(38, 22, 10, 0.18);
+}
+
+.message-command-row button {
+  min-height: 38px;
+}
+
+.delete-choice-sheet > button.danger {
+  color: #fff;
+  background: #d31919;
+}
+
+.app.dark .pinned-message-bar {
+  background: rgba(38, 33, 29, 0.94);
+}
+
+.app.dark .reaction-picker {
+  background: rgba(38, 33, 29, 0.98);
+}
+
+@media (max-width: 520px) {
+  .message-actions,
+  .bubble.theirs .message-actions,
+  .bubble.ai .message-actions {
+    right: 0;
+    left: auto;
+    max-width: min(236px, 76vw);
+  }
+
+  .bubble.theirs .message-actions,
+  .bubble.ai .message-actions {
+    left: 0;
+    right: auto;
+  }
+}

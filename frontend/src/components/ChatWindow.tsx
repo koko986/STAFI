@@ -3,14 +3,20 @@ import {
   Check,
   CheckCheck,
   ChevronLeft,
+  Circle,
+  CircleCheck,
+  Clipboard,
   File as FileIcon,
+  Flag,
   Forward,
   LoaderCircle,
   Mic,
   Moon,
   Paperclip,
+  Pin,
   Reply,
   Send,
+  Share2,
   Square,
   Sun,
   Trash2,
@@ -81,9 +87,13 @@ export function ChatWindow({
   const [voiceError, setVoiceError] = useState<string>();
   const [mediaError, setMediaError] = useState<string>();
   const [selectedMessageId, setSelectedMessageId] = useState<string>();
+  const [selectedForBulk, setSelectedForBulk] = useState<string[]>([]);
   const [replyingTo, setReplyingTo] = useState<Message>();
   const [forwardingMessageId, setForwardingMessageId] = useState<string>();
   const [deleteCandidate, setDeleteCandidate] = useState<Message>();
+  const [reportCandidate, setReportCandidate] = useState<Message>();
+  const [pinnedIds, setPinnedIds] = useState<string[]>([]);
+  const [notice, setNotice] = useState("");
   const recorderRef = useRef<MediaRecorder>();
   const chunksRef = useRef<Blob[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -98,14 +108,23 @@ export function ChatWindow({
     () => conversations.filter((item) => item.id !== conversation?.id),
     [conversation?.id, conversations]
   );
+  const pinnedMessages = useMemo(
+    () => pinnedIds
+      .map((id) => messages.find((message) => message.id === id))
+      .filter((message): message is Message => Boolean(message)),
+    [messages, pinnedIds]
+  );
 
   useEffect(() => {
     setSelectedMessageId(undefined);
+    setSelectedForBulk([]);
     setReplyingTo(undefined);
     setForwardingMessageId(undefined);
     setDeleteCandidate(undefined);
+    setReportCandidate(undefined);
     setVoiceError(undefined);
     setMediaError(undefined);
+    setNotice("");
   }, [conversation?.id]);
 
   useEffect(() => {
@@ -217,12 +236,20 @@ export function ChatWindow({
 
   function selectMessage(event: MouseEvent, message: Message) {
     event.stopPropagation();
+    if (selectedForBulk.length) {
+      toggleBulkSelection(message.id);
+      return;
+    }
     setSelectedMessageId((current) => current === message.id ? undefined : message.id);
   }
 
   function selectMessageWithKeyboard(event: KeyboardEvent, message: Message) {
     if (event.key !== "Enter" && event.key !== " ") return;
     event.preventDefault();
+    if (selectedForBulk.length) {
+      toggleBulkSelection(message.id);
+      return;
+    }
     setSelectedMessageId((current) => current === message.id ? undefined : message.id);
   }
 
@@ -244,6 +271,74 @@ export function ChatWindow({
     window.setTimeout(() => setSelectedMessageId((current) => current === messageId ? undefined : current), 1400);
   }
 
+  function readableMessage(message: Message) {
+    if (message.body) return message.body;
+    if (message.type === "voice") return "Voice message";
+    if (message.type === "photo") return "Photo";
+    if (message.type === "video") return "Video";
+    if (message.type === "file") return "Attachment";
+    return "Message";
+  }
+
+  function toggleBulkSelection(messageId: string) {
+    setSelectedForBulk((current) =>
+      current.includes(messageId)
+        ? current.filter((id) => id !== messageId)
+        : [...current, messageId]
+    );
+  }
+
+  function startSelection(message: Message) {
+    setSelectedMessageId(undefined);
+    setSelectedForBulk([message.id]);
+  }
+
+  async function copyMessage(message: Message) {
+    setSelectedMessageId(undefined);
+    try {
+      await navigator.clipboard?.writeText(readableMessage(message));
+      setNotice("Message copied.");
+    } catch {
+      setNotice("Could not copy this message.");
+    }
+  }
+
+  async function shareSelectedMessages() {
+    const selectedText = messages
+      .filter((message) => selectedForBulk.includes(message.id))
+      .map(readableMessage)
+      .join("\n\n");
+    if (!selectedText) return;
+    try {
+      if (navigator.share) {
+        await navigator.share({ text: selectedText });
+        setNotice("Shared.");
+      } else {
+        await navigator.clipboard?.writeText(selectedText);
+        setNotice("Selected messages copied.");
+      }
+    } catch {
+      setNotice("Could not share selected messages.");
+    }
+  }
+
+  function togglePin(message: Message) {
+    const isPinned = pinnedIds.includes(message.id);
+    setSelectedMessageId(undefined);
+    setPinnedIds((current) =>
+      isPinned
+        ? current.filter((id) => id !== message.id)
+        : [message.id, ...current]
+    );
+    setNotice(isPinned ? "Message unpinned." : "Message pinned.");
+  }
+
+  function askStafi(message: Message) {
+    setSelectedMessageId(undefined);
+    setReplyingTo(message);
+    onAskAi("summarize");
+  }
+
   function senderLabel(message: Message) {
     return message.senderId === "me" || message.senderId === currentUserId
       ? "You"
@@ -254,6 +349,21 @@ export function ChatWindow({
 
   return (
     <section className="chat-window">
+      {selectedForBulk.length > 0 ? (
+        <header className="chat-selection-header">
+          <button type="button" title="Cancel selection" onClick={() => setSelectedForBulk([])}>
+            <X size={21} />
+          </button>
+          <strong>{selectedForBulk.length} Selected</strong>
+          <button
+            className="select-all-button"
+            type="button"
+            onClick={() => setSelectedForBulk(messages.map((message) => message.id))}
+          >
+            Select All
+          </button>
+        </header>
+      ) : (
       <header className="chat-header">
         <button className="mobile-back" type="button" title="Back to chats" onClick={onBack}>
           <ChevronLeft size={20} />
@@ -287,14 +397,57 @@ export function ChatWindow({
           </button>
         </div>
       </header>
-      <div className="messages" onClick={() => setSelectedMessageId(undefined)}>
+      )}
+      {notice && (
+        <div className="chat-notice" role="status">
+          <span>{notice}</span>
+          <button type="button" title="Dismiss" onClick={() => setNotice("")}>
+            <X size={14} />
+          </button>
+        </div>
+      )}
+      {pinnedMessages.length > 0 && selectedForBulk.length === 0 && (
+        <div className="pinned-message-bar">
+          <button
+            className="pinned-message-main"
+            type="button"
+            title="Jump to pinned message"
+            onClick={() => {
+              const pinned = pinnedMessages[0];
+              const target = messageRefs.current[pinned.id];
+              target?.scrollIntoView({ behavior: "smooth", block: "center" });
+              setSelectedMessageId(pinned.id);
+              window.setTimeout(() => setSelectedMessageId((current) => current === pinned.id ? undefined : current), 1200);
+            }}
+          >
+            <Pin size={15} />
+            <span>
+              <strong>Pinned message</strong>
+              <small>{readableMessage(pinnedMessages[0])}</small>
+            </span>
+          </button>
+          <button
+            className="pinned-message-close"
+            type="button"
+            title="Unpin message"
+            onClick={() => {
+              setPinnedIds((current) => current.filter((id) => id !== pinnedMessages[0].id));
+              setNotice("Message unpinned.");
+            }}
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}      <div className={selectedForBulk.length ? "messages selection-mode" : "messages"} onClick={() => setSelectedMessageId(undefined)}>
         {messages.map((message) => {
           const mine = message.senderId === "me" || message.senderId === currentUserId;
           const selected = selectedMessageId === message.id;
+          const bulkSelected = selectedForBulk.includes(message.id);
+          const pinned = pinnedIds.includes(message.id);
           const bubbleClass = message.type === "ai" ? "bubble ai" : mine ? "bubble mine" : "bubble theirs";
           return (
             <article
-              className={`${bubbleClass}${selected ? " selected" : ""}`}
+              className={`${bubbleClass}${selected ? " selected" : ""}${bulkSelected ? " bulk-selected" : ""}${pinned ? " pinned" : ""}`}
               key={message.id}
               ref={(element) => {
                 messageRefs.current[message.id] = element;
@@ -304,6 +457,25 @@ export function ChatWindow({
               onClick={(event) => selectMessage(event, message)}
               onKeyDown={(event) => selectMessageWithKeyboard(event, message)}
             >
+              {selectedForBulk.length > 0 && (
+                <button
+                  className="bulk-select-dot"
+                  type="button"
+                  title={bulkSelected ? "Unselect message" : "Select message"}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    toggleBulkSelection(message.id);
+                  }}
+                >
+                  {bulkSelected ? <CircleCheck size={22} /> : <Circle size={22} />}
+                </button>
+              )}
+              {pinned && (
+                <span className="message-context pinned-context">
+                  <Pin size={13} />
+                  Pinned
+                </span>
+              )}
               {message.forwarded && (
                 <span className="message-context">
                   <Forward size={13} />
@@ -362,7 +534,7 @@ export function ChatWindow({
                   {mine && <MessageStatus status={message.status || "sent"} />}
                 </span>
               </footer>
-              {selected && (
+              {selected && selectedForBulk.length === 0 && (
                 <div className="message-actions" onClick={(event) => event.stopPropagation()}>
                   <div className="reaction-picker" aria-label="Message reactions">
                     {reactionOptions.map((reaction) => (
@@ -400,6 +572,29 @@ export function ChatWindow({
                       <Forward size={16} />
                       <span>Forward</span>
                     </button>
+                    <button type="button" title="Select" onClick={() => startSelection(message)}>
+                      <CircleCheck size={16} />
+                      <span>Select</span>
+                    </button>
+                    <button type="button" title="Copy" onClick={() => copyMessage(message)}>
+                      <Clipboard size={16} />
+                      <span>Copy</span>
+                    </button>
+                    <button type="button" title={pinned ? "Unpin" : "Pin"} onClick={() => togglePin(message)}>
+                      <Pin size={16} />
+                      <span>{pinned ? "Unpin" : "Pin"}</span>
+                    </button>
+                    <button
+                      type="button"
+                      title="Report"
+                      onClick={() => {
+                        setReportCandidate(message);
+                        setSelectedMessageId(undefined);
+                      }}
+                    >
+                      <Flag size={16} />
+                      <span>Report</span>
+                    </button>
                     {message.senderId && (
                       <button
                         className="danger"
@@ -414,6 +609,10 @@ export function ChatWindow({
                         <span>Delete</span>
                       </button>
                     )}
+                    <button className="ask-stafi-action" type="button" title="Ask STAFI" onClick={() => askStafi(message)}>
+                      <WandSparkles size={16} />
+                      <span>Ask STAFI</span>
+                    </button>
                   </div>
                 </div>
               )}
@@ -470,28 +669,103 @@ export function ChatWindow({
             <button
               type="button"
               onClick={async () => {
-                await onDelete(deleteCandidate, "me");
-                setDeleteCandidate(undefined);
+                try {
+                  await onDelete(deleteCandidate, "me");
+                  setDeleteCandidate(undefined);
+                  setSelectedForBulk([]);
+                  setNotice("Message deleted for you.");
+                } catch {
+                  setNotice("Could not delete this message for you.");
+                }
               }}
             >
               Delete only for me
             </button>
-            {(deleteCandidate.senderId === "me" || deleteCandidate.senderId === currentUserId) && (
-              <button
-                className="danger"
-                type="button"
-                onClick={async () => {
+            <button
+              className="danger"
+              type="button"
+              onClick={async () => {
+                try {
                   await onDelete(deleteCandidate, "all");
                   setDeleteCandidate(undefined);
-                }}
-              >
-                Delete for everyone
-              </button>
-            )}
+                  setSelectedForBulk([]);
+                  setNotice("Message deleted for everyone.");
+                } catch {
+                  setNotice("Could not delete for everyone. You may only be able to delete your own messages.");
+                }
+              }}
+            >
+              Delete for everyone
+            </button>
           </section>
         </div>
       )}
-      <div className="composer-shell">
+      {reportCandidate && (
+        <div className="report-backdrop" role="presentation" onClick={() => setReportCandidate(undefined)}>
+          <section
+            className="report-sheet"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="report-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header>
+              <div>
+                <h2 id="report-title">Report Message</h2>
+                <p>Select a reason for reporting.</p>
+              </div>
+              <button type="button" title="Close report" onClick={() => setReportCandidate(undefined)}>
+                <X size={22} />
+              </button>
+            </header>
+            {["Spam", "Child abuse", "Violence", "Illegal goods and services", "Illegal adult content", "Personal data", "Copyright", "Other"].map((reason) => (
+              <button className="report-option" type="button" key={reason}>
+                <Circle size={22} />
+                <span>{reason}</span>
+              </button>
+            ))}
+            <button
+              className="primary-button report-submit"
+              type="button"
+              onClick={() => {
+                setReportCandidate(undefined);
+                setNotice("Report submitted.");
+              }}
+            >
+              Submit Report
+            </button>
+          </section>
+        </div>
+      )}
+      {selectedForBulk.length > 0 && (
+        <div className="selection-toolbar">
+          <button
+            className="danger"
+            type="button"
+            onClick={() => {
+              const first = messages.find((message) => selectedForBulk.includes(message.id));
+              if (first) setDeleteCandidate(first);
+            }}
+          >
+            <Trash2 size={20} />
+            <span>Delete</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const first = messages.find((message) => selectedForBulk.includes(message.id));
+              if (first) setForwardingMessageId(first.id);
+            }}
+          >
+            <Forward size={20} />
+            <span>Forward</span>
+          </button>
+          <button type="button" onClick={shareSelectedMessages}>
+            <Share2 size={20} />
+            <span>Share</span>
+          </button>
+        </div>
+      )}      <div className="composer-shell">
         {voiceError && (
           <div className="voice-error" role="alert">
             <span>{voiceError}</span>
