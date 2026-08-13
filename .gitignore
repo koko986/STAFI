@@ -18,4 +18,5 @@ frontend/npm-debug.log*
 
 # Local runtime output and accidental nested dependencies
 .runlogs/
+uploads/
 backend/node_modules/

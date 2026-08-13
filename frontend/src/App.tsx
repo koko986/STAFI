@@ -619,13 +619,15 @@ export function App() {
   async function sendMedia(file: File, replyToMessageId?: string) {
     if (!active) return;
     const mimeType = file.type.toLowerCase();
-    const type = mimeType.startsWith("image/")
+    const extension = file.name.split(".").pop()?.toLowerCase()
+      || (mimeType.startsWith("image/") ? "jpg" : mimeType.startsWith("video/") ? "mp4" : "bin");
+    const imageExtensions = new Set(["jpg", "jpeg", "png", "webp", "gif", "heic", "heif"]);
+    const videoExtensions = new Set(["mp4", "webm", "mov"]);
+    const type = mimeType.startsWith("image/") || imageExtensions.has(extension)
       ? "photo"
-      : mimeType.startsWith("video/")
+      : mimeType.startsWith("video/") || videoExtensions.has(extension)
         ? "video"
         : "file";
-    const extension = file.name.split(".").pop()
-      || (type === "photo" ? "jpg" : type === "video" ? "mp4" : "bin");
     const uploaded = await uploadMedia("chat-files", file, extension);
     const replyingTo = replyToMessageId
       ? activeMessages.find((message) => message.id === replyToMessageId)

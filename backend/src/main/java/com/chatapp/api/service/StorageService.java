@@ -14,6 +14,8 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -90,30 +92,34 @@ public class StorageService {
     private final RestClient restClient;
     private final String supabaseUrl;
     private final String serviceKey;
+    private final String publicBaseUrl;
+    private final Path localUploadRoot;
     private final Set<String> ensuredBuckets = ConcurrentHashMap.newKeySet();
 
     public StorageService(
             RestClient.Builder restClientBuilder,
             @Value("${app.supabase-url:}") String supabaseUrl,
-            @Value("${app.supabase-service-role-key:}") String serviceKey
+            @Value("${app.supabase-service-role-key:}") String serviceKey,
+            @Value("${app.public-base-url:http://localhost:${server.port:8080}}") String publicBaseUrl,
+            @Value("${app.local-upload-dir:uploads}") String localUploadDir
     ) {
         this.restClient = restClientBuilder.build();
         this.supabaseUrl = supabaseUrl.replaceAll("/+$", "");
         this.serviceKey = serviceKey;
+        this.publicBaseUrl = publicBaseUrl.replaceAll("/+$", "");
+        this.localUploadRoot = Path.of(localUploadDir).toAbsolutePath().normalize();
     }
 
     public MediaUploadResponse upload(String bucket, UUID userId, MultipartFile file) {
-        requireConfigured();
         BucketRules rules = BUCKETS.get(bucket);
         if (rules == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported media bucket.");
         }
-        ensureBucket(bucket);
         if (file.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Choose a file to upload.");
         }
 
-        String contentType = normalizeContentType(file.getContentType());
+        String contentType = normalizeContentType(file);
         if (!rules.contentTypes().contains(contentType)) {
             throw new ResponseStatusException(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "This file type is not supported.");
         }
@@ -128,6 +134,10 @@ public class StorageService {
         }
 
         String path = userId + "/" + UUID.randomUUID() + "." + EXTENSIONS.get(contentType);
+        if (!isSupabaseConfigured()) {
+            return saveLocal(bucket, path, file);
+        }
+        ensureBucket(bucket);
         try {
             restClient.post()
                     .uri(supabaseUrl + "/storage/v1/object/" + bucket + "/" + path)
@@ -158,11 +168,14 @@ public class StorageService {
         if (path == null || path.isBlank() || path.startsWith("http://") || path.startsWith("https://")) {
             return path;
         }
-        requireConfigured();
         BucketRules rules = BUCKETS.get(bucket);
         if (rules == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported media bucket.");
         }
+        if (path.startsWith("local/")) {
+            return localUrl(path);
+        }
+        requireConfigured();
         if (rules.publicRead()) {
             return supabaseUrl + "/storage/v1/object/public/" + bucket + "/" + path;
         }
@@ -186,10 +199,14 @@ public class StorageService {
         if (path == null || path.isBlank() || path.startsWith("http://") || path.startsWith("https://")) {
             return;
         }
-        requireConfigured();
         if (!BUCKETS.containsKey(bucket)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported media bucket.");
         }
+        if (path.startsWith("local/")) {
+            deleteLocal(path);
+            return;
+        }
+        requireConfigured();
         restClient.delete()
                 .uri(supabaseUrl + "/storage/v1/object/" + bucket + "/" + path)
                 .header("apikey", serviceKey)
@@ -198,12 +215,56 @@ public class StorageService {
                 .toBodilessEntity();
     }
 
+    public Path localFile(String bucket, UUID userId, String filename) {
+        if (!BUCKETS.containsKey(bucket)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported media bucket.");
+        }
+        Path target = localUploadRoot.resolve(bucket).resolve(userId.toString()).resolve(filename).normalize();
+        if (!target.startsWith(localUploadRoot) || !Files.isRegularFile(target)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Media file not found.");
+        }
+        return target;
+    }
+
     private void requireConfigured() {
         if (supabaseUrl.isBlank() || serviceKey.isBlank()) {
             throw new ResponseStatusException(
                     HttpStatus.SERVICE_UNAVAILABLE,
                     "Supabase storage is not configured on the Java backend."
-            );
+                );
+        }
+    }
+
+    private boolean isSupabaseConfigured() {
+        return !supabaseUrl.isBlank() && !serviceKey.isBlank();
+    }
+
+    private MediaUploadResponse saveLocal(String bucket, String path, MultipartFile file) {
+        Path target = localUploadRoot.resolve(bucket).resolve(path).normalize();
+        if (!target.startsWith(localUploadRoot)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid upload path.");
+        }
+        try {
+            Files.createDirectories(target.getParent());
+            file.transferTo(target);
+            String localPath = "local/" + bucket + "/" + path;
+            return new MediaUploadResponse(localPath, localUrl(localPath));
+        } catch (IOException exception) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Could not store the uploaded file.", exception);
+        }
+    }
+
+    private String localUrl(String localPath) {
+        return publicBaseUrl + "/api/media/files/" + localPath.replaceFirst("^local/", "");
+    }
+
+    private void deleteLocal(String localPath) {
+        Path target = localUploadRoot.resolve(localPath.replaceFirst("^local/", "")).normalize();
+        if (!target.startsWith(localUploadRoot)) return;
+        try {
+            Files.deleteIfExists(target);
+        } catch (IOException exception) {
+            log.warn("Could not delete local media '{}': {}", localPath, exception.getMessage());
         }
     }
 
@@ -243,9 +304,39 @@ public class StorageService {
         }
     }
 
-    private String normalizeContentType(String contentType) {
-        if (contentType == null) return "";
-        return contentType.split(";", 2)[0].trim().toLowerCase();
+    private String normalizeContentType(MultipartFile file) {
+        String contentType = file.getContentType() == null
+                ? ""
+                : file.getContentType().split(";", 2)[0].trim().toLowerCase();
+        if (!contentType.isBlank() && !"application/octet-stream".equals(contentType) && !"image/jpg".equals(contentType)) {
+            return contentType;
+        }
+        String name = file.getOriginalFilename() == null ? "" : file.getOriginalFilename().toLowerCase();
+        if (name.endsWith(".jpg") || name.endsWith(".jpeg")) return "image/jpeg";
+        if (name.endsWith(".png")) return "image/png";
+        if (name.endsWith(".webp")) return "image/webp";
+        if (name.endsWith(".gif")) return "image/gif";
+        if (name.endsWith(".heic")) return "image/heic";
+        if (name.endsWith(".heif")) return "image/heif";
+        if (name.endsWith(".mp4")) return "video/mp4";
+        if (name.endsWith(".webm")) return "video/webm";
+        if (name.endsWith(".mov")) return "video/quicktime";
+        if (name.endsWith(".mp3")) return "audio/mpeg";
+        if (name.endsWith(".m4a")) return "audio/mp4";
+        if (name.endsWith(".wav")) return "audio/wav";
+        if (name.endsWith(".ogg")) return "audio/ogg";
+        if (name.endsWith(".pdf")) return "application/pdf";
+        if (name.endsWith(".zip")) return "application/zip";
+        if (name.endsWith(".doc")) return "application/msword";
+        if (name.endsWith(".docx")) return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+        if (name.endsWith(".xls")) return "application/vnd.ms-excel";
+        if (name.endsWith(".xlsx")) return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+        if (name.endsWith(".ppt")) return "application/vnd.ms-powerpoint";
+        if (name.endsWith(".pptx")) return "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+        if (name.endsWith(".txt")) return "text/plain";
+        if (name.endsWith(".csv")) return "text/csv";
+        if (name.endsWith(".md")) return "text/markdown";
+        return contentType;
     }
 
     private record BucketRules(long maxBytes, Set<String> contentTypes, boolean publicRead) {
