@@ -52,7 +52,7 @@ type Props = {
   onSendVoice: (voice: Blob, replyToMessageId?: string) => Promise<void>;
   onSendMedia: (file: File, replyToMessageId?: string) => Promise<void>;
   onRefreshVoice: (messageId: string) => Promise<string>;
-  onAskAi: (action: "summarize" | "draft-reply") => void;
+  onAskAi: (action: "summarize" | "draft-reply" | "question", promptOverride?: string) => void;
   onBack: () => void;
   onOpenInfo: () => void;
   onDelete: (message: Message, mode: "me" | "all") => Promise<void>;
@@ -135,6 +135,12 @@ export function ChatWindow({
     if (!selectedMessageId) return;
     messageRefs.current[selectedMessageId]?.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [selectedMessageId]);
+
+  useEffect(() => {
+    if (!notice) return;
+    const timeout = window.setTimeout(() => setNotice(""), 3000);
+    return () => window.clearTimeout(timeout);
+  }, [notice]);
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -335,8 +341,8 @@ export function ChatWindow({
 
   function askStafi(message: Message) {
     setSelectedMessageId(undefined);
-    setReplyingTo(message);
-    onAskAi("summarize");
+    const question = readableMessage(message);
+    onAskAi("question", `Answer this question only. Do not summarize the chat: ${question}`);
   }
 
   function senderLabel(message: Message) {

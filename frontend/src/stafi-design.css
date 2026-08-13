@@ -2908,3 +2908,175 @@ body:has(.login-shell) {
     right: auto;
   }
 }
+
+/* Story viewer and message popup final polish */
+.story-viewer {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
+}
+
+.story-viewer-header {
+  position: relative;
+  z-index: 6;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 76px;
+  padding: max(12px, env(safe-area-inset-top)) 14px 10px;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.72), rgba(0, 0, 0, 0.3) 70%, transparent);
+}
+
+.story-profile-button {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  border: 0;
+  color: #fff;
+  background: transparent;
+  text-align: left;
+}
+
+.story-profile-button .avatar,
+.story-viewer-header .story-profile-button .avatar {
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  overflow: hidden;
+  border: 2px solid rgba(255, 255, 255, 0.72);
+  border-radius: 999px !important;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.story-profile-button .avatar img,
+.story-viewer-header .story-profile-button .avatar img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 999px !important;
+  object-fit: cover;
+}
+
+.story-profile-button strong,
+.story-profile-button small {
+  max-width: 100%;
+  overflow: hidden;
+  color: #fff;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.story-profile-button small {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  opacity: 0.86;
+}
+
+.story-viewer-header > button:not(.story-profile-button) {
+  width: 48px;
+  height: 48px;
+  border-radius: 999px;
+  color: #fff;
+  background: rgba(28, 38, 63, 0.82);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.story-media {
+  position: relative;
+  z-index: 1;
+  min-height: 0;
+  margin-top: 0;
+}
+
+.story-media img,
+.story-media video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.messages:has(.bubble.selected)::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 18;
+  pointer-events: none;
+  background: rgba(251, 249, 248, 0.34);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+}
+
+.app.dark .messages:has(.bubble.selected)::before {
+  background: rgba(0, 0, 0, 0.28);
+}
+
+.bubble.selected {
+  z-index: 35;
+  filter: none;
+}
+
+.bubble.selected .message-actions {
+  z-index: 48;
+}
+
+.bubble.selected.mine .message-actions {
+  top: calc(100% + 10px);
+  bottom: auto;
+  right: 0;
+}
+
+.bubble.selected.theirs .message-actions,
+.bubble.selected.ai .message-actions {
+  top: calc(100% + 10px);
+  bottom: auto;
+  left: 0;
+  right: auto;
+}
+
+.bubble.selected.mine {
+  margin-bottom: 270px;
+}
+
+.bubble.selected.theirs,
+.bubble.selected.ai {
+  margin-bottom: 270px;
+}
+
+@media (max-width: 520px) {
+  .story-viewer-header {
+    min-height: 74px;
+    padding-inline: 12px;
+  }
+
+  .story-profile-button {
+    grid-template-columns: 44px minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .story-profile-button .avatar,
+  .story-viewer-header .story-profile-button .avatar {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+  }
+
+  .story-viewer-header > button:not(.story-profile-button) {
+    width: 44px;
+    height: 44px;
+  }
+
+  .bubble.selected.mine,
+  .bubble.selected.theirs,
+  .bubble.selected.ai {
+    margin-bottom: 286px;
+  }
+}
+
+.messages {
+  position: relative;
+}
