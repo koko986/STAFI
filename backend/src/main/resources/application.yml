@@ -22,6 +22,7 @@ app:
   supabase-jwt-issuer: ${SUPABASE_JWT_ISSUER:https://bwmxmswnarwfaemeaxeh.supabase.co/auth/v1}
   supabase-jwks-url: ${SUPABASE_JWKS_URL:https://bwmxmswnarwfaemeaxeh.supabase.co/auth/v1/.well-known/jwks.json}
   supabase-url: ${SUPABASE_URL:https://bwmxmswnarwfaemeaxeh.supabase.co}
+  supabase-publishable-key: ${SUPABASE_PUBLISHABLE_KEY:${SUPABASE_ANON_KEY:${VITE_SUPABASE_PUBLISHABLE_KEY:sb_publishable_MjFtfVUu3bGzmnUJIV9InA_XGKVSYox}}}
   supabase-service-role-key: ${SUPABASE_SECRET_KEY:${SUPABASE_SERVICE_ROLE_KEY:}}
   groq-api-url: ${GROQ_API_URL:https://api.groq.com/openai/v1}
   groq-model: ${GROQ_MODEL:llama-3.3-70b-versatile}
