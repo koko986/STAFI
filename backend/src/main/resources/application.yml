@@ -1,9 +1,9 @@
 server:
-  port: 8080
+  port: ${PORT:8080}
 
 logging:
   file:
-    name: ${LOGGING_FILE_NAME:../.runlogs/backend.log}
+    name: ${LOGGING_FILE_NAME:/tmp/stafi-backend.log}
 
 spring:
   config:

@@ -1,14 +1,16 @@
 import { supabase } from "./supabase";
 
 function adaptLocalAddress(configuredUrl: string | undefined, fallbackPort: number) {
-  const fallback = `${window.location.protocol}//${window.location.hostname}:${fallbackPort}`;
+  const browserIsLocal = window.location.hostname === "localhost"
+    || window.location.hostname === "127.0.0.1";
+  const fallback = browserIsLocal
+    ? `${window.location.protocol}//${window.location.hostname}:${fallbackPort}`
+    : window.location.origin;
   if (!configuredUrl) return fallback;
   try {
     const parsed = new URL(configuredUrl);
     const configuredIsLocal = parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1";
-    const browserIsRemote = window.location.hostname !== "localhost"
-      && window.location.hostname !== "127.0.0.1";
-    if (configuredIsLocal && browserIsRemote) parsed.hostname = window.location.hostname;
+    if (configuredIsLocal && !browserIsLocal) return window.location.origin;
     return parsed.toString().replace(/\/$/, "");
   } catch {
     return configuredUrl.replace(/\/$/, "");
