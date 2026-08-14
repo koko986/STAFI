@@ -40,7 +40,7 @@ public class SupabaseAuthenticationFilter extends OncePerRequestFilter {
         this.restClient = restClientBuilder.build();
         this.objectMapper = objectMapper;
         this.supabaseUrl = supabaseUrl.replaceAll("/+$", "");
-        this.apiKey = publishableKey.isBlank() ? serviceRoleKey : publishableKey;
+        this.apiKey = serviceRoleKey.isBlank() ? publishableKey : serviceRoleKey;
     }
 
     @Override
