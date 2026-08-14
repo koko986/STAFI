@@ -112,6 +112,7 @@ export function App() {
   );
   const [profile, setProfile] = useState<Profile>();
   const [profileReady, setProfileReady] = useState(!isSupabaseConfigured);
+  const [profileError, setProfileError] = useState("");
   const [profileOpen, setProfileOpen] = useState(false);
   const [friendProfile, setFriendProfile] = useState<Profile>();
   const [mobileChatOpen, setMobileChatOpen] = useState(false);
@@ -305,13 +306,21 @@ export function App() {
     if (!loggedIn) return;
     if (demoMode) {
       setProfile(demoProfile);
+      setProfileError("");
       setProfileReady(true);
       return;
     }
     setProfileReady(false);
+    setProfileError("");
     apiGet<Profile>("/api/me/profile")
-      .then(setProfile)
-      .catch(() => setProfile(undefined))
+      .then((loadedProfile) => {
+        setProfile(loadedProfile);
+        setProfileError("");
+      })
+      .catch((error: Error) => {
+        setProfile(undefined);
+        setProfileError(error.message || "The backend could not load your profile.");
+      })
       .finally(() => setProfileReady(true));
   }, [demoMode, loggedIn]);
 
@@ -964,7 +973,7 @@ export function App() {
       <main className="loading-shell" aria-live="polite">
         <div className="loading-mark" aria-hidden="true">!</div>
         <strong>Could not load your profile</strong>
-        <span>Check that the Java backend is running, then try again.</span>
+        <span>{profileError || "Check that the Java backend is running, then try again."}</span>
         <button className="primary-button" type="button" onClick={() => window.location.reload()}>
           Try again
         </button>

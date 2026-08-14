@@ -6,7 +6,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
 import org.springframework.security.oauth2.jwt.JwtDecoders;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.web.SecurityFilterChain;
@@ -51,7 +50,6 @@ public class SecurityConfig {
                             jwt -> jwt.decoder(jwtJwksUrl.isBlank()
                                     ? JwtDecoders.fromIssuerLocation(jwtIssuer)
                                     : NimbusJwtDecoder.withJwkSetUri(jwtJwksUrl)
-                                            .jwsAlgorithm(SignatureAlgorithm.ES256)
                                             .build())
                     ));
         } else {

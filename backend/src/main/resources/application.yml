@@ -17,11 +17,11 @@ spring:
 
 app:
   security:
-    enabled: ${APP_SECURITY_ENABLED:false}
-  cors-allowed-origin-patterns: ${CORS_ALLOWED_ORIGIN_PATTERNS:http://localhost:[*],http://127.0.0.1:[*],http://192.168.*:[*],http://10.*:[*],http://172.*:[*],http://*.local:[*]}
-  supabase-jwt-issuer: ${SUPABASE_JWT_ISSUER:}
-  supabase-jwks-url: ${SUPABASE_JWKS_URL:}
-  supabase-url: ${SUPABASE_URL:}
+    enabled: ${APP_SECURITY_ENABLED:true}
+  cors-allowed-origin-patterns: ${CORS_ALLOWED_ORIGIN_PATTERNS:http://localhost:[*],http://127.0.0.1:[*],http://192.168.*:[*],http://10.*:[*],http://172.*:[*],http://*.local:[*],https://*.vercel.app}
+  supabase-jwt-issuer: ${SUPABASE_JWT_ISSUER:https://bwmxmswnarwfaemeaxeh.supabase.co/auth/v1}
+  supabase-jwks-url: ${SUPABASE_JWKS_URL:https://bwmxmswnarwfaemeaxeh.supabase.co/auth/v1/.well-known/jwks.json}
+  supabase-url: ${SUPABASE_URL:https://bwmxmswnarwfaemeaxeh.supabase.co}
   supabase-service-role-key: ${SUPABASE_SECRET_KEY:${SUPABASE_SERVICE_ROLE_KEY:}}
   groq-api-url: ${GROQ_API_URL:https://api.groq.com/openai/v1}
   groq-model: ${GROQ_MODEL:llama-3.3-70b-versatile}

@@ -32,9 +32,21 @@ async function authHeaders(includeJsonContentType = true): Promise<Record<string
   };
 }
 
+async function responseError(response: Response): Promise<Error> {
+  const fallback = `${response.status} ${response.statusText}`.trim();
+  const text = await response.text();
+  if (!text) return new Error(fallback);
+  try {
+    const data = JSON.parse(text) as { message?: string; error?: string; status?: number };
+    return new Error(data.message || data.error || fallback);
+  } catch {
+    return new Error(text);
+  }
+}
+
 export async function apiGet<T>(path: string): Promise<T> {
   const response = await fetch(`${API_URL}${path}`, { headers: await authHeaders() });
-  if (!response.ok) throw new Error(await response.text());
+  if (!response.ok) throw await responseError(response);
   return response.json();
 }
 
@@ -44,7 +56,7 @@ export async function apiPost<T>(path: string, body: unknown): Promise<T> {
     headers: await authHeaders(),
     body: JSON.stringify(body)
   });
-  if (!response.ok) throw new Error(await response.text());
+  if (!response.ok) throw await responseError(response);
   return response.json();
 }
 
@@ -54,7 +66,7 @@ export async function apiPut<T>(path: string, body: unknown): Promise<T> {
     headers: await authHeaders(),
     body: JSON.stringify(body)
   });
-  if (!response.ok) throw new Error(await response.text());
+  if (!response.ok) throw await responseError(response);
   return response.json();
 }
 
@@ -63,7 +75,7 @@ export async function apiDelete(path: string): Promise<void> {
     method: "DELETE",
     headers: await authHeaders(false)
   });
-  if (!response.ok) throw new Error(await response.text());
+  if (!response.ok) throw await responseError(response);
 }
 
 export async function apiDeleteJson<T>(path: string): Promise<T> {
@@ -71,7 +83,7 @@ export async function apiDeleteJson<T>(path: string): Promise<T> {
     method: "DELETE",
     headers: await authHeaders(false)
   });
-  if (!response.ok) throw new Error(await response.text());
+  if (!response.ok) throw await responseError(response);
   return response.json();
 }
 
@@ -83,7 +95,7 @@ export async function apiUpload<T>(path: string, file: Blob, filename: string): 
     headers: await authHeaders(false),
     body: formData
   });
-  if (!response.ok) throw new Error(await response.text());
+  if (!response.ok) throw await responseError(response);
   return response.json();
 }
 
