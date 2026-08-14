@@ -60,6 +60,7 @@ export function ChatDiscovery({
   const [busy, setBusy] = useState(false);
   const [openingProfileId, setOpeningProfileId] = useState<string>();
   const [connections, setConnections] = useState<Connection[]>([]);
+  const [suggestedPeople, setSuggestedPeople] = useState<Profile[]>([]);
   const [connectionBusyId, setConnectionBusyId] = useState<string>();
   const [status, setStatus] = useState("");
 
@@ -129,8 +130,17 @@ export function ChatDiscovery({
       }))));
   }, [fallbackPeople]);
 
+  useEffect(() => {
+    apiGet<Profile[]>("/api/profiles/suggestions")
+      .then(setSuggestedPeople)
+      .catch(() => setSuggestedPeople(fallbackPeople));
+  }, [fallbackPeople]);
+
   const incomingRequests = connections.filter((connection) => connection.direction === "incoming");
   const contacts = connections.filter((connection) => connection.status === "accepted");
+  const connectableSuggestions = suggestedPeople
+    .filter((suggestion) => !connectionFor(suggestion.id))
+    .slice(0, 6);
 
   function connectionFor(profileId: string) {
     return connections.find((connection) => connection.profile.id === profileId);
@@ -503,6 +513,48 @@ export function ChatDiscovery({
                 </button>
                 <button type="button" title="Message" onClick={() => startDirect(connection.profile)}>
                   <MessageCircle size={17} />
+                </button>
+              </div>
+            ))}
+          </section>
+        )}
+
+        {!normalizedQuery && connectableSuggestions.length > 0 && (
+          <section className="connection-results suggested-friends" aria-label="Suggested friends">
+            <div className="section-label"><span>Suggested friends</span><small>{connectableSuggestions.length}</small></div>
+            {connectableSuggestions.map((suggestion) => (
+              <div className="contact-row suggested-friend-row" key={suggestion.id}>
+                <button
+                  className="contact-main"
+                  type="button"
+                  onClick={() => onViewProfile(suggestion)}
+                >
+                  <span className="avatar">
+                    {suggestion.avatarPath
+                      ? <img src={suggestion.avatarPath} alt="" />
+                      : <UserRound size={18} />}
+                  </span>
+                  <span>
+                    <strong>{suggestion.displayName}</strong>
+                    <small>@{suggestion.username}</small>
+                    {suggestion.bio && <small className="person-bio">{suggestion.bio}</small>}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  title="Connect"
+                  onClick={() => requestConnection(suggestion)}
+                  disabled={connectionBusyId === suggestion.id}
+                >
+                  {connectionBusyId === suggestion.id ? <Clock3 size={17} /> : <UserPlus size={17} />}
+                </button>
+                <button
+                  type="button"
+                  title="Message"
+                  onClick={() => startDirect(suggestion)}
+                  disabled={Boolean(openingProfileId)}
+                >
+                  {openingProfileId === suggestion.id ? <Clock3 size={17} /> : <MessageCircle size={17} />}
                 </button>
               </div>
             ))}

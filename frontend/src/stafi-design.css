@@ -3090,3 +3090,33 @@ body:has(.login-shell) {
 .ai-tab > .ai-assistant-panel + .ai-tool-grid + .ai-quick-actions {
   margin-top: 0;
 }
+
+/* New account connection suggestions */
+.suggested-friends {
+  margin-top: 4px;
+}
+
+.suggested-friend-row {
+  background: linear-gradient(135deg, rgba(255, 250, 245, 0.96), rgba(243, 224, 201, 0.34));
+}
+
+.suggested-friend-row .contact-main .person-bio {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.suggested-friend-row > button:not(.contact-main) {
+  color: var(--stafi-primary);
+  background: rgba(255, 219, 199, 0.58);
+}
+
+.suggested-friend-row > button:not(.contact-main):hover {
+  color: #fff;
+  background: var(--stafi-primary-container);
+}
+
+.app.dark .suggested-friend-row {
+  background: linear-gradient(135deg, rgba(38, 33, 29, 0.96), rgba(152, 72, 0, 0.16));
+}

@@ -87,6 +87,10 @@ public class ProfileService {
         return profiles;
     }
 
+    public List<Profile> suggestions(UUID currentUserId) {
+        return search("", currentUserId);
+    }
+
     public Optional<Profile> find(UUID profileId) {
         JsonNode row = database.first(database.query(
                 "profiles",

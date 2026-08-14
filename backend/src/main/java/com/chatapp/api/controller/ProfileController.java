@@ -49,6 +49,11 @@ public class ProfileController {
         return profileService.search(q, userContext.requireUserId(jwt));
     }
 
+    @GetMapping("/profiles/suggestions")
+    public List<Profile> suggestions(@AuthenticationPrincipal Jwt jwt) {
+        return profileService.suggestions(userContext.requireUserId(jwt));
+    }
+
     @GetMapping("/profiles/{profileId}")
     public Profile profile(
             @PathVariable("profileId") UUID profileId,
