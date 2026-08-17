@@ -1,0 +1,6 @@
+[services.backend]
+rootDirectory = "backend"
+
+[services.backend.build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"

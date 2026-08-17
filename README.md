@@ -137,7 +137,8 @@ The backend (Java) runs on **Railway** and the frontend (React) runs on **Vercel
 
 1. Create a Railway project and add a service from this repo, or push to a Railway Git
    integration branch.
-2. Set the service **Root Directory** to `backend`. Railway auto-detects `backend/Dockerfile`.
+2. The repo-root `railway.toml` pins the service to the `backend/` directory and the
+   `backend/Dockerfile`, so no manual Root Directory setting is needed.
 3. Add the environment variables from `backend/.env.example`:
    - `SUPABASE_URL`, `SUPABASE_JWT_ISSUER`, `SUPABASE_JWKS_URL`, `SUPABASE_SECRET_KEY`
    - `APP_SECURITY_ENABLED=true`
