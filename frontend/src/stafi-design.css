@@ -1,4 +1,4 @@
-﻿@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&family=Sora:wght@600;700;800;900&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&family=Sora:wght@600;700;800;900&display=swap");
 
 :root {
   --stafi-bg: #fbf9f8;
@@ -1626,18 +1626,33 @@ body:has(.login-shell) {
   margin-top: 8px;
 }
 
-.google-button {
+.google-button,
+.demo-login-button {
   width: 100%;
   min-height: 54px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  border: 1px solid rgba(222, 193, 177, 0.72);
   border-radius: 16px;
+  color: var(--stafi-ink);
+  background: var(--stafi-card);
   font-family: Sora, Inter, sans-serif;
   font-size: 15px;
+  font-weight: 800;
   box-shadow: 0 10px 24px rgba(76, 33, 0, 0.06);
 }
 
-.google-button:hover {
+.google-button:hover,
+.demo-login-button:hover {
   border-color: rgba(152, 72, 0, 0.42);
   background: #fffaf5;
+}
+
+.demo-login-button {
+  color: #311300;
+  background: rgba(255, 219, 199, 0.42);
 }
 
 .create-account-copy {
@@ -1669,7 +1684,8 @@ body:has(.login-shell) {
   color: rgba(255, 247, 240, 0.42);
 }
 
-.app.dark .google-button:hover {
+.app.dark .google-button:hover,
+.app.dark .demo-login-button:hover {
   border-color: rgba(255, 178, 111, 0.34);
   background: rgba(255, 255, 255, 0.07);
 }
@@ -1687,7 +1703,8 @@ body:has(.login-shell) {
   }
 
   .auth-form .primary-button,
-  .google-button {
+  .google-button,
+  .demo-login-button {
     min-height: 52px;
   }
 }
@@ -3120,3 +3137,4 @@ body:has(.login-shell) {
 .app.dark .suggested-friend-row {
   background: linear-gradient(135deg, rgba(38, 33, 29, 0.96), rgba(152, 72, 0, 0.16));
 }
+

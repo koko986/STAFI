@@ -380,7 +380,7 @@ export function App() {
   }, [demoMode, loggedIn, profile?.onboarded]);
 
   useEffect(() => {
-    if (!loggedIn || !active) return;
+    if (!loggedIn || demoMode || !active) return;
     let mounted = true;
     const loadMessages = () => {
       apiGet<Message[]>(`/api/conversations/${active.id}/messages`)
@@ -398,10 +398,10 @@ export function App() {
       mounted = false;
       window.clearInterval(refresh);
     };
-  }, [active, loggedIn]);
+  }, [active, demoMode, loggedIn]);
 
   useEffect(() => {
-    if (!loggedIn || !conversations.length) return;
+    if (!loggedIn || demoMode || !conversations.length) return;
     let presenceTimer: number | undefined;
     const client = new Client({
       webSocketFactory: () => new SockJS(WS_URL),
@@ -482,7 +482,7 @@ export function App() {
       }
       client.deactivate();
     };
-  }, [active?.id, conversations, loggedIn, profile?.id]);
+  }, [active?.id, conversations, demoMode, loggedIn, profile?.id]);
 
   async function send(body: string, replyToMessageId?: string) {
     if (!active) return;
@@ -892,6 +892,24 @@ export function App() {
     setSearchOpen((current) => activeTab === "chats" ? !current : true);
   }
 
+  function enterDemoMode() {
+    setReady(true);
+    setLoggedIn(true);
+    setDemoMode(true);
+    setProfile(demoProfile);
+    setProfileError("");
+    setProfileReady(true);
+    setAccountContact("Demo account");
+    setConversations(fallbackConversations);
+    setActive(fallbackConversations[0]);
+    setMessages([]);
+    setUnreadCounts({});
+    setPresenceSeenAt({});
+    setStories([]);
+    setProfileOpen(false);
+    setFriendProfile(undefined);
+  }
+
   async function signOut() {
     if (!demoMode) await supabase.auth.signOut();
     setDemoMode(false);
@@ -957,7 +975,7 @@ export function App() {
     );
   }
   if (!loggedIn) {
-    return <Login />;
+    return <Login onDemoLogin={enterDemoMode} />;
   }
   if (!profileReady) {
     return (
@@ -976,6 +994,9 @@ export function App() {
         <span>{profileError || "Check that the Java backend is running, then try again."}</span>
         <button className="primary-button" type="button" onClick={() => window.location.reload()}>
           Try again
+        </button>
+        <button className="secondary-button" type="button" onClick={enterDemoMode}>
+          Continue in demo mode
         </button>
         <button className="text-button" type="button" onClick={signOut}>
           Sign out
@@ -1527,3 +1548,4 @@ function ProfileTab({
     </section>
   );
 }
+

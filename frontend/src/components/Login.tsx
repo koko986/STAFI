@@ -1,10 +1,14 @@
-﻿import { ArrowLeft, ArrowRight, Eye, KeyRound, Mail, ShieldCheck, Sparkles, Zap } from "lucide-react";
+import { ArrowLeft, ArrowRight, Eye, KeyRound, Mail, MonitorPlay, ShieldCheck, Sparkles, Zap } from "lucide-react";
 import { useState } from "react";
 import { supabase } from "../lib/supabase";
 
 type AuthMode = "sign-in" | "sign-up";
 
-export function Login() {
+type LoginProps = {
+  onDemoLogin: () => void;
+};
+
+export function Login({ onDemoLogin }: LoginProps) {
   const [authMode, setAuthMode] = useState<AuthMode>("sign-in");
   const [showAuth, setShowAuth] = useState(false);
   const [email, setEmail] = useState("");
@@ -207,6 +211,10 @@ export function Login() {
           <Mail size={18} />
           Google
         </button>
+        <button className="demo-login-button" type="button" onClick={onDemoLogin} disabled={busy}>
+          <MonitorPlay size={18} />
+          Continue in demo mode
+        </button>
         {status && <p className="status" role="status">{status}</p>}
         <p className="create-account-copy">
           {authMode === "sign-up" ? "Already have an account?" : "Don't have an account?"}{" "}
@@ -222,3 +230,4 @@ export function Login() {
     </main>
   );
 }
+
