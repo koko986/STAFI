@@ -150,7 +150,8 @@ The backend (Java) runs on **Railway** and the frontend (React) runs on **Vercel
 
 ### 2. Frontend on Vercel
 
-1. Deploy this repo as a Vercel project (`vercel.json` serves only `frontend/`).
+1. Deploy this repo as a Vercel project. In **Settings > General > Root Directory** set
+   `frontend` (Vercel auto-detects Vite; `frontend/vercel.json` serves the SPA).
 2. Add these environment variables to the Vercel project (Production), pointing at Railway:
    - `VITE_API_URL=https://your-backend.up.railway.app`
    - `VITE_WS_URL=https://your-backend.up.railway.app/ws`
