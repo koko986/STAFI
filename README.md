@@ -129,6 +129,36 @@ $env:GROQ_API_URL="https://api.groq.com/openai/v1"
 If the configured model is overloaded or unavailable, the backend automatically tries
 `llama-3.3-70b-versatile` and `llama-3.1-8b-instant` before falling back to the offline assistant.
 
+## Deploy
+
+The backend (Java) runs on **Railway** and the frontend (React) runs on **Vercel**.
+
+### 1. Backend on Railway
+
+1. Create a Railway project and add a service from this repo, or push to a Railway Git
+   integration branch.
+2. Set the service **Root Directory** to `backend`. Railway auto-detects `backend/Dockerfile`.
+3. Add the environment variables from `backend/.env.example`:
+   - `SUPABASE_URL`, `SUPABASE_JWT_ISSUER`, `SUPABASE_JWKS_URL`, `SUPABASE_SECRET_KEY`
+   - `APP_SECURITY_ENABLED=true`
+   - `CORS_ALLOWED_ORIGIN_PATTERNS` (must include your Vercel domain, e.g.
+     `https://your-app.vercel.app`; the default already allows `https://*.vercel.app`)
+   - `GROQ_SUMMARIZE_API_KEY`, `GROQ_VOICE_API_KEY`, `GROQ_CONVERSATION_API_KEY` for AI
+4. Railway sets `PORT` automatically; the backend reads it from `application.yml`.
+   Copy the service URL, for example `https://your-backend.up.railway.app`.
+
+### 2. Frontend on Vercel
+
+1. Deploy this repo as a Vercel project (`vercel.json` serves only `frontend/`).
+2. Add these environment variables to the Vercel project (Production), pointing at Railway:
+   - `VITE_API_URL=https://your-backend.up.railway.app`
+   - `VITE_WS_URL=https://your-backend.up.railway.app/ws`
+   - Optionally `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` (the hosted values
+     are built in and used when unset)
+3. Redeploy. The frontend calls the Railway backend directly for REST and WebSocket traffic.
+4. Add the exact Vercel frontend URL, for example `https://your-app.vercel.app/**`, to
+   **Supabase Dashboard > Authentication > URL Configuration > Redirect URLs** for Google login.
+
 ## Production Notes
 
 - Keep `SUPABASE_SECRET_KEY` on the Java server. Never expose it through a `VITE_` value.

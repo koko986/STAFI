@@ -3,43 +3,6 @@
   "services": {
     "frontend": {
       "root": "frontend/"
-    },
-    "backend": {
-      "root": "backend/",
-      "entrypoint": "Dockerfile.vercel",
-      "runtime": "container"
     }
-  },
-  "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": {
-        "service": "backend"
-      }
-    },
-    {
-      "source": "/ws",
-      "destination": {
-        "service": "backend"
-      }
-    },
-    {
-      "source": "/ws/(.*)",
-      "destination": {
-        "service": "backend"
-      }
-    },
-    {
-      "source": "/actuator/(.*)",
-      "destination": {
-        "service": "backend"
-      }
-    },
-    {
-      "source": "/(.*)",
-      "destination": {
-        "service": "frontend"
-      }
-    }
-  ]
+  }
 }
