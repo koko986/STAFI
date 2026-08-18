@@ -122,12 +122,12 @@ $env:GROQ_CONVERSATION_API_KEY="your-conversation-key"
 Optional overrides:
 
 ```powershell
-$env:GROQ_MODEL="llama-3.3-70b-versatile"
+$env:GROQ_MODEL="groq/compound"
 $env:GROQ_API_URL="https://api.groq.com/openai/v1"
 ```
 
 If the configured model is overloaded or unavailable, the backend automatically tries
-`llama-3.3-70b-versatile` and `llama-3.1-8b-instant` before falling back to the offline assistant.
+`qwen/qwen3.6-27b` and `openai/gpt-oss-20b` before falling back to the offline assistant.
 
 ## Deploy
 

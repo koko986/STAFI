@@ -21,7 +21,7 @@ import java.util.UUID;
 @Service
 public class AiService {
     private static final Logger log = LoggerFactory.getLogger(AiService.class);
-    private static final List<String> FALLBACK_MODELS = List.of("llama-3.3-70b-versatile", "llama-3.1-8b-instant");
+    private static final List<String> FALLBACK_MODELS = List.of("qwen/qwen3.6-27b", "openai/gpt-oss-20b");
 
     private final RestClient restClient;
     private final String groqUrl;
