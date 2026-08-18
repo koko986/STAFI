@@ -1126,30 +1126,8 @@ export function App() {
             </button>
           </span>
         </div>
-        {activeTab === "chats" && (
+{activeTab === "chats" && (
           <>
-            {!searchOpen && (
-              <>
-                <div className="chat-filter-pills stafi-segments" aria-label="Chat filters">
-                  {([
-                    ["all", "All"],
-                    ["direct", "Chats"],
-                    ["group", "Groups"],
-                    ["ai", "AI"]
-                  ] as Array<[ChatFilter, string]>).map(([value, label]) => (
-                    <button
-                      className={chatFilter === value ? "active" : ""}
-                      type="button"
-                      key={value}
-                      onClick={() => setChatFilter(value)}
-                    >
-                      {label}
-                      {value === "ai" && aiConversations.length > 0 && <small>{aiConversations.length}</small>}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
             <ChatDiscovery
               conversations={filteredConversations}
               activeId={active?.id}
@@ -1167,19 +1145,39 @@ export function App() {
               onCreateGroup={createGroup}
               fallbackPeople={demoMode ? demoPeople : noPeople}
               strip={!searchOpen && (
-                <Stories
-                  stories={stories}
-                  currentUserId={profile.id}
-                  openOwnerId={storyOwnerToOpen}
-                  onOwnerStoryOpened={() => setStoryOwnerToOpen(undefined)}
-                  onCreate={createStory}
-                  onDelete={deleteStory}
-                  onViewed={viewStory}
-                  onReact={reactToStory}
-                  onRemoveReaction={removeStoryReaction}
-                  onReply={replyToStory}
-                  onViewProfile={(profileId) => openFriendProfile(profileId)}
-                />
+                <div className="stories-cover">
+                  <div className="chat-filter-pills stafi-segments" aria-label="Chat filters">
+                    {([
+                      ["all", "All"],
+                      ["direct", "Chats"],
+                      ["group", "Groups"],
+                      ["ai", "AI"]
+                    ] as Array<[ChatFilter, string]>).map(([value, label]) => (
+                      <button
+                        className={chatFilter === value ? "active" : ""}
+                        type="button"
+                        key={value}
+                        onClick={() => setChatFilter(value)}
+                      >
+                        {label}
+                        {value === "ai" && aiConversations.length > 0 && <small>{aiConversations.length}</small>}
+                      </button>
+                    ))}
+                  </div>
+                  <Stories
+                    stories={stories}
+                    currentUserId={profile.id}
+                    openOwnerId={storyOwnerToOpen}
+                    onOwnerStoryOpened={() => setStoryOwnerToOpen(undefined)}
+                    onCreate={createStory}
+                    onDelete={deleteStory}
+                    onViewed={viewStory}
+                    onReact={reactToStory}
+                    onRemoveReaction={removeStoryReaction}
+                    onReply={replyToStory}
+                    onViewProfile={(profileId) => openFriendProfile(profileId)}
+                  />
+                </div>
               )}
             />
             <button className="compose-fab" type="button" title="New chat" onClick={toggleSearch}>

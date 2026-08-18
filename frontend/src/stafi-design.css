@@ -847,46 +847,26 @@ body:has(.login-shell) {
   scrollbar-width: thin;
 }
 
-/* Telegram-style stories cover: the strip lives inside the chat-list scroller
-   and sticks to its top; chat rows (higher z) slide over it while scrolling. */
+/* The filter pills and stories strip live inside the chat-list scroller and
+   scroll away with the list — no sticky, works on every screen size. */
 .sidebar {
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
 }
 
-.app .discovery-content:not(.search-only) {
-  position: relative;
+.app .discovery-content:not(.search-only) .stories-cover {
+  flex: 0 0 auto;
+  align-self: start;
+  background: var(--stafi-surface);
 }
 
 .app .discovery-content:not(.search-only) .stories {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  flex: 0 0 auto;
-  height: 110px;
   margin: 0;
   background: var(--stafi-surface);
   border-bottom: 1px solid rgba(222, 193, 177, 0.18);
 }
 
 .app .discovery-content:not(.search-only) .chat-results {
-  position: relative;
-  z-index: 2;
   background: var(--stafi-bg);
-}
-
-/* Phones: no sticky/z-index games — the strip just scrolls away with the
-   chat list (Safari iOS is unreliable with sticky inside scrollers). */
-@media (max-width: 820px) {
-  .app .discovery-content:not(.search-only) .stories {
-    position: relative;
-    top: auto;
-    z-index: auto;
-  }
-
-  .app .discovery-content:not(.search-only) .chat-results {
-    position: static;
-    z-index: auto;
-  }
 }
 
 .stories::-webkit-scrollbar,
