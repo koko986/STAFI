@@ -2,15 +2,19 @@ package com.chatapp.api.controller;
 
 import com.chatapp.api.model.AiRequest;
 import com.chatapp.api.model.AiResponse;
+import com.chatapp.api.model.SpeechRequest;
 import com.chatapp.api.service.AiService;
 import com.chatapp.api.service.UserContext;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/api/ai")
@@ -58,5 +62,15 @@ public class AiController {
                 new AiRequest(request.conversationId(), "voice", request.prompt()),
                 userContext.requireUserId(jwt)
         );
+    }
+
+    @PostMapping(value = "/speech", produces = "audio/wav")
+    public ResponseEntity<byte[]> speech(@Valid @RequestBody SpeechRequest request, @AuthenticationPrincipal Jwt jwt) {
+        userContext.requireUserId(jwt);
+        try {
+            return ResponseEntity.ok(aiService.synthesizeSpeech(request.text()));
+        } catch (RuntimeException exception) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Speech generation failed: " + exception.getMessage());
+        }
     }
 }

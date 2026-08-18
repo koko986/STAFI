@@ -119,10 +119,18 @@ $env:GROQ_CONVERSATION_API_KEY="your-conversation-key"
 - Voice assistant requests use the **voice** key.
 - Summaries use the **summarize** key.
 
+Summary playback uses Groq text-to-speech (`canopylabs/orpheus-v1-english`) with the **voice**
+key. The TTS model needs the terms accepted once in the Groq console:
+`https://console.groq.com/playground?model=canopylabs%2Forpheus-v1-english`. Until then the
+browser's built-in voice is used instead. The summary voice can be muted with the speaker
+button in the chat header.
+
 Optional overrides:
 
 ```powershell
 $env:GROQ_MODEL="groq/compound"
+$env:GROQ_TTS_MODEL="canopylabs/orpheus-v1-english"
+$env:GROQ_TTS_VOICE="hannah"   # autumn, diana, hannah, austin, daniel, troy
 $env:GROQ_API_URL="https://api.groq.com/openai/v1"
 ```
 

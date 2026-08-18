@@ -60,6 +60,16 @@ export async function apiPost<T>(path: string, body: unknown): Promise<T> {
   return response.json();
 }
 
+export async function apiPostAudio(path: string, body: unknown): Promise<Blob> {
+  const response = await fetch(`${API_URL}${path}`, {
+    method: "POST",
+    headers: await authHeaders(),
+    body: JSON.stringify(body)
+  });
+  if (!response.ok) throw await responseError(response);
+  return response.blob();
+}
+
 export async function apiPut<T>(path: string, body: unknown): Promise<T> {
   const response = await fetch(`${API_URL}${path}`, {
     method: "PUT",

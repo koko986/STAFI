@@ -21,6 +21,8 @@ import {
   Sun,
   Trash2,
   UserRound,
+  Volume2,
+  VolumeX,
   WandSparkles,
   X
 } from "lucide-react";
@@ -53,6 +55,9 @@ type Props = {
   onSendMedia: (file: File, replyToMessageId?: string) => Promise<void>;
   onRefreshVoice: (messageId: string) => Promise<string>;
   onAskAi: (action: "summarize" | "draft-reply" | "question", promptOverride?: string) => void;
+  aiBusy: boolean;
+  summaryVoice: boolean;
+  onToggleSummaryVoice: () => void;
   onBack: () => void;
   onOpenInfo: () => void;
   onDelete: (message: Message, mode: "me" | "all") => Promise<void>;
@@ -73,6 +78,9 @@ export function ChatWindow({
   onSendMedia,
   onRefreshVoice,
   onAskAi,
+  aiBusy,
+  summaryVoice,
+  onToggleSummaryVoice,
   onBack,
   onOpenInfo,
   onDelete,
@@ -392,8 +400,19 @@ export function ChatWindow({
           </span>
         </button>
         <div className="header-actions">
-          <button title="Summarize with AI" onClick={() => onAskAi("summarize")}>
-            <Bot size={18} />
+          <button
+            title={aiBusy ? "Summarizing..." : "Summarize with AI"}
+            onClick={() => onAskAi("summarize")}
+            disabled={aiBusy}
+          >
+            {aiBusy ? <LoaderCircle className="spin" size={18} /> : <Bot size={18} />}
+          </button>
+          <button
+            className={summaryVoice ? "active" : ""}
+            title={summaryVoice ? "Summary voice: on (tap to mute)" : "Summary voice: off (tap to unmute)"}
+            onClick={onToggleSummaryVoice}
+          >
+            {summaryVoice ? <Volume2 size={18} /> : <VolumeX size={18} />}
           </button>
           <button title="Draft a reply with AI" onClick={() => onAskAi("draft-reply")}>
             <WandSparkles size={18} />

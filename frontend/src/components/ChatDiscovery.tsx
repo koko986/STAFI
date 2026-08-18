@@ -35,6 +35,7 @@ type Props = {
   onViewProfile: (profile: Profile) => void;
   onCreateGroup: (title: string, memberIds: string[]) => Promise<void>;
   fallbackPeople?: Profile[];
+  strip?: React.ReactNode;
 };
 
 export function ChatDiscovery({
@@ -48,7 +49,8 @@ export function ChatDiscovery({
   onStartDirect,
   onViewProfile,
   onCreateGroup,
-  fallbackPeople = []
+  fallbackPeople = [],
+  strip
 }: Props) {
   const [query, setQuery] = useState("");
   const [people, setPeople] = useState<Profile[]>([]);
@@ -374,6 +376,7 @@ export function ChatDiscovery({
 
       {!searchOpen && (
       <div className="discovery-content">
+        {strip}
         {normalizedQuery.length >= 2 && (
           <section className="people-results" aria-label="People">
             <div className="section-label">

@@ -5,9 +5,10 @@ import {
   Bot,
   ChevronRight,
   Code2,
-  FileText,
+FileText,
   Image as ImageIcon,
   Languages,
+  LoaderCircle,
   LogOut,
   Menu,
   MessageCircle,
@@ -42,6 +43,7 @@ import {
   apiDeleteJson,
   apiGet,
   apiPost,
+  apiPostAudio,
   apiPut,
   WS_URL,
   type Conversation,
@@ -82,6 +84,59 @@ type AppTab = "chats" | "ai" | "settings" | "profile";
 type ChatFilter = "all" | "direct" | "group" | "ai";
 type AiApiResponse = { text: string; message?: Message };
 
+function splitForSpeech(text: string): string[] {
+  const clean = text
+    .replace(/^\s*[-*•]\s*/gm, "")
+    .replace(/\n+/g, ". ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!clean) return [];
+  const maxLength = 180;
+  const parts: string[] = [];
+  let remaining = clean;
+  while (remaining.length > maxLength) {
+    let cut = remaining.lastIndexOf(". ", maxLength);
+    if (cut < maxLength * 0.4) cut = remaining.lastIndexOf(" ", maxLength);
+    if (cut <= 0) cut = maxLength;
+    parts.push(remaining.slice(0, cut + 1).trim());
+    remaining = remaining.slice(cut + 1).trim();
+  }
+  if (remaining) parts.push(remaining);
+  return parts;
+}
+
+function playSpeechBlob(blob: Blob): Promise<void> {
+  const url = URL.createObjectURL(blob);
+  const audio = new Audio(url);
+  return new Promise<void>((resolve, reject) => {
+    audio.onended = () => resolve();
+    audio.onerror = () => reject(new Error("audio playback failed"));
+    audio.play().catch((error) => reject(error));
+  }).finally(() => URL.revokeObjectURL(url));
+}
+
+async function speakSummary(text: string) {
+  if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+  try {
+    for (const chunk of splitForSpeech(text)) {
+      const blob = await apiPostAudio("/api/ai/speech", { text: chunk });
+      await playSpeechBlob(blob);
+    }
+  } catch {
+    window.speechSynthesis.cancel();
+    const readable = text
+      .replace(/^\s*[-*•]\s*/gm, "")
+      .replace(/\n+/g, ". ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!readable) return;
+    const utterance = new SpeechSynthesisUtterance(readable);
+    utterance.rate = 0.96;
+    utterance.pitch = 1;
+    window.speechSynthesis.speak(utterance);
+  }
+}
+
 function applyLocalReaction(message: Message, reaction?: MessageReaction): Message {
   const previous = message.ownReaction;
   const reactions = { ...(message.reactions || {}) };
@@ -120,6 +175,10 @@ export function App() {
   const [chatFilter, setChatFilter] = useState<ChatFilter>("all");
   const [searchOpen, setSearchOpen] = useState(false);
   const [storyOwnerToOpen, setStoryOwnerToOpen] = useState<string>();
+  const [aiBusy, setAiBusy] = useState(false);
+  const [summaryVoice, setSummaryVoice] = useState(
+    () => localStorage.getItem("java-chat-summary-voice") !== "off"
+  );
   const [accountContact, setAccountContact] = useState(
     isSupabaseConfigured ? "" : "Demo account"
   );
@@ -843,6 +902,7 @@ export function App() {
         }
       ]);
     }
+    if (action === "summarize") setAiBusy(true);
     const response = await aiRequest(action, prompt).then(
       (text) => ({ text }),
       () => ({
@@ -853,6 +913,10 @@ export function App() {
             : "AI assistant is ready once the Java backend is running."
       })
     );
+    if (action === "summarize") {
+      setAiBusy(false);
+      if (summaryVoice) void speakSummary(response.text);
+    }
 
     setMessages((current) => [
       ...current,
@@ -872,6 +936,14 @@ export function App() {
     const next = theme === "dark" ? "light" : "dark";
     setTheme(next);
     localStorage.setItem("java-chat-theme", next);
+  }
+
+  function toggleSummaryVoice() {
+    if (summaryVoice && "speechSynthesis" in window) window.speechSynthesis.cancel();
+    setSummaryVoice((current) => {
+      localStorage.setItem("java-chat-summary-voice", current ? "off" : "on");
+      return !current;
+    });
   }
 
   function openTab(tab: AppTab) {
@@ -1076,19 +1148,6 @@ export function App() {
                     </button>
                   ))}
                 </div>
-                <Stories
-                  stories={stories}
-                  currentUserId={profile.id}
-                  openOwnerId={storyOwnerToOpen}
-                  onOwnerStoryOpened={() => setStoryOwnerToOpen(undefined)}
-                  onCreate={createStory}
-                  onDelete={deleteStory}
-                  onViewed={viewStory}
-                  onReact={reactToStory}
-                  onRemoveReaction={removeStoryReaction}
-                  onReply={replyToStory}
-                  onViewProfile={(profileId) => openFriendProfile(profileId)}
-                />
               </>
             )}
             <ChatDiscovery
@@ -1107,6 +1166,21 @@ export function App() {
               onViewProfile={(selectedProfile) => openFriendProfile(selectedProfile)}
               onCreateGroup={createGroup}
               fallbackPeople={demoMode ? demoPeople : noPeople}
+              strip={!searchOpen && (
+                <Stories
+                  stories={stories}
+                  currentUserId={profile.id}
+                  openOwnerId={storyOwnerToOpen}
+                  onOwnerStoryOpened={() => setStoryOwnerToOpen(undefined)}
+                  onCreate={createStory}
+                  onDelete={deleteStory}
+                  onViewed={viewStory}
+                  onReact={reactToStory}
+                  onRemoveReaction={removeStoryReaction}
+                  onReply={replyToStory}
+                  onViewProfile={(profileId) => openFriendProfile(profileId)}
+                />
+              )}
             />
             <button className="compose-fab" type="button" title="New chat" onClick={toggleSearch}>
               <PenLine size={24} />
@@ -1122,6 +1196,7 @@ export function App() {
               setMobileChatOpen(true);
             }}
             onSummarize={() => askAi("summarize")}
+            summarizeBusy={aiBusy}
             onDraft={() => askAi("draft-reply")}
             onAsk={(prompt) => askAi("question", prompt)}
             onChat={(prompt) => askAi("chat", prompt)}
@@ -1179,6 +1254,9 @@ export function App() {
         onSendMedia={sendMedia}
         onRefreshVoice={refreshVoiceMedia}
         onAskAi={askAi}
+        aiBusy={aiBusy}
+        summaryVoice={summaryVoice}
+        onToggleSummaryVoice={toggleSummaryVoice}
         onDelete={deleteMessage}
         onForward={forwardMessage}
         onReact={reactToMessage}
@@ -1218,6 +1296,7 @@ function AiTab({
   activeId,
   onSelect,
   onSummarize,
+  summarizeBusy,
   onDraft,
   onAsk,
   onChat
@@ -1226,6 +1305,7 @@ function AiTab({
   activeId?: string;
   onSelect: (conversation: Conversation) => void;
   onSummarize: () => void;
+  summarizeBusy: boolean;
   onDraft: () => void;
   onAsk: (prompt: string) => Promise<string | undefined>;
   onChat: (prompt: string) => Promise<string | undefined>;
@@ -1409,11 +1489,11 @@ function AiTab({
         ))}
       </div>
       <div className="quick-actions ai-quick-actions">
-        <button type="button" onClick={onSummarize}>
-          <Bot size={18} />
+        <button type="button" onClick={onSummarize} disabled={summarizeBusy}>
+          {summarizeBusy ? <LoaderCircle className="spin" size={18} /> : <Bot size={18} />}
           <span>
-            <strong>Summarize active chat</strong>
-            <small>Catch up fast</small>
+            <strong>{summarizeBusy ? "Summarizing..." : "Summarize active chat"}</strong>
+            <small>{summarizeBusy ? "Working on it" : "Catch up fast"}</small>
           </span>
         </button>
         <button type="button" onClick={onDraft}>

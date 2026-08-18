@@ -26,6 +26,8 @@ public class AiService {
     private final RestClient restClient;
     private final String groqUrl;
     private final String model;
+    private final String ttsModel;
+    private final String ttsVoice;
     private final String summarizeKey;
     private final String voiceKey;
     private final String conversationKey;
@@ -36,6 +38,8 @@ public class AiService {
             RestClient.Builder restClientBuilder,
             @Value("${app.groq-api-url:}") String groqUrl,
             @Value("${app.groq-model:}") String model,
+            @Value("${app.groq-tts-model:}") String ttsModel,
+            @Value("${app.groq-tts-voice:}") String ttsVoice,
             @Value("${app.groq-summarize-key:}") String summarizeKey,
             @Value("${app.groq-voice-key:}") String voiceKey,
             @Value("${app.groq-conversation-key:}") String conversationKey,
@@ -45,6 +49,8 @@ public class AiService {
         this.restClient = restClientBuilder.build();
         this.groqUrl = groqUrl.replaceAll("/+$", "");
         this.model = model;
+        this.ttsModel = ttsModel;
+        this.ttsVoice = ttsVoice;
         this.summarizeKey = summarizeKey;
         this.voiceKey = voiceKey;
         this.conversationKey = conversationKey;
@@ -84,7 +90,7 @@ public class AiService {
 
     private String systemInstruction(String action) {
         return switch (action) {
-            case "summarize" -> "Summarize this chat accurately in concise bullet points. Do not invent facts.";
+            case "summarize" -> "Summarize this chat in at most 3 very short bullet points, under 60 words total. Do not invent facts.";
             case "question" -> "Answer the user's question using the provided chat context when relevant. Be concise, useful, and clear when the context is missing.";
             case "draft-reply" -> "Draft one friendly, concise reply to the chat. Return only the reply.";
             case "voice" -> "You are a concise voice assistant inside a private chat application. Speak in short, natural sentences because your answers are read aloud.";
@@ -100,6 +106,24 @@ public class AiService {
             if (hosted != null) return hosted;
         }
         return offlineResponse(request);
+    }
+
+    public byte[] synthesizeSpeech(String text) {
+        String key = firstConfigured(voiceKey, conversationKey, summarizeKey);
+        if (groqUrl.isBlank() || ttsModel.isBlank() || key.isBlank()) {
+            throw new IllegalStateException("Groq text-to-speech is not configured.");
+        }
+        Map<String, Object> requestBody = new LinkedHashMap<>();
+        requestBody.put("model", ttsModel);
+        requestBody.put("voice", ttsVoice);
+        requestBody.put("input", text);
+        requestBody.put("response_format", "wav");
+        return restClient.post()
+                .uri(groqUrl + "/audio/speech")
+                .header("Authorization", "Bearer " + key)
+                .body(requestBody)
+                .retrieve()
+                .body(byte[].class);
     }
 
     private String apiKeyFor(String action) {
@@ -214,7 +238,7 @@ public class AiService {
         List<String> lines = prompt.lines()
                 .map(String::trim)
                 .filter(line -> !line.isBlank())
-                .limit(6)
+                .limit(3)
                 .toList();
         if (lines.isEmpty()) return "No chat messages yet.";
         return "Quick summary:\n- " + String.join("\n- ", lines);
