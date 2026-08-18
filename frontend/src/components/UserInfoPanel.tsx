@@ -49,8 +49,11 @@ export function UserInfoPanel({
   );
 
   useEffect(() => {
-    if (!profile) return;
     setTab("media");
+  }, [profile?.id]);
+
+  useEffect(() => {
+    if (!profile) return;
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
     };

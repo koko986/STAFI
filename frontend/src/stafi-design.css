@@ -869,6 +869,12 @@ body:has(.login-shell) {
   background: var(--stafi-bg);
 }
 
+.header-actions button:first-child {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .stories::-webkit-scrollbar,
 .discovery-content::-webkit-scrollbar {
   width: 4px;
